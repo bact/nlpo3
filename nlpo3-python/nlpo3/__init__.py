@@ -15,6 +15,9 @@ from typing import List, Tuple
 # import from .so (Rust)
 from ._nlpo3_python_backend import load_dict as rust_load_dict
 from ._nlpo3_python_backend import segment as rust_segment
+from .deepcut import segment_deepcut
+
+__all__ = ["load_dict", "segment", "segment_deepcut"]
 
 # TODO: load_dict from in-memory list of words
 

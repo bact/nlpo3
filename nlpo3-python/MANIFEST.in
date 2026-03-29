@@ -8,6 +8,9 @@ graft nlpo3
 include nlpo3/py.typed
 recursive-include nlpo3 *.pyi
 
+# Include ONNX model files
+recursive-include nlpo3 *.onnx
+
 # Exclude test notebooks and tests from the sdist to keep it small
 prune tests
 prune notebooks
