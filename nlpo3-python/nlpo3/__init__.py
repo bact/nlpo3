@@ -9,13 +9,15 @@
 # Thanathip Suntorntip
 # Arthit Suriyawongkul
 
+from __future__ import annotations
+
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 # import from .so (Rust)
 from ._nlpo3_python_backend import load_dict as rust_load_dict
 from ._nlpo3_python_backend import segment as rust_segment
-from .deepcut import segment_deepcut
+from ._nlpo3_python_backend import segment_deepcut as rust_segment_deepcut
 
 __all__ = ["load_dict", "segment", "segment_deepcut"]
 
@@ -70,3 +72,43 @@ def segment(
     result = rust_segment(text, dict_name, safe, parallel)
 
     return result
+
+
+def segment_deepcut(
+    text: str,
+    model_path: Optional[str] = None,
+    providers: Optional[List[str]] = None,
+) -> List[str]:
+    """Break text into tokens using the deepcut CNN model.
+
+    Uses a deep learning model (CNN) originally from the deepcut library,
+    ported to ONNX format via LEKCut.  The default model is bundled and
+    runs via the Rust ONNX engine (tract).
+
+    When ``model_path`` or ``providers`` are specified, the Python
+    implementation is used instead (requires ``pip install nlpo3[deepcut]``).
+
+    :param text: Input text
+    :type text: str
+    :param model_path: Path to a custom deepcut ONNX model file.
+        Uses the bundled default model if not specified.
+    :type model_path: str, optional
+    :param providers: ONNX Runtime execution providers (Python path only).
+        Defaults to ``["CPUExecutionProvider"]``.
+        Pass ``["CUDAExecutionProvider", "CPUExecutionProvider"]``
+        for GPU acceleration (requires ``onnxruntime-gpu``).
+    :type providers: list[str], optional
+    :return: List of tokens
+    :rtype: List[str]
+    """
+    if not text or not isinstance(text, str):
+        return []
+
+    if model_path is not None or providers is not None:
+        # Fall back to the Python implementation for custom models/providers.
+        from .deepcut import segment_deepcut as py_segment_deepcut
+
+        return py_segment_deepcut(text, model_path=model_path, providers=providers)
+
+    return rust_segment_deepcut(text)
+

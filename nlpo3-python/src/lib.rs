@@ -20,6 +20,8 @@ use pyo3::prelude::*;
 use pyo3::types::PyString;
 use pyo3::{exceptions, wrap_pyfunction};
 
+mod deepcut;
+
 lazy_static! {
     static ref TOKENIZER_COLLECTION: Mutex<HashMap<String, Box<NewmmTokenizer>>> =
         Mutex::new(HashMap::new());
@@ -123,9 +125,30 @@ fn remove_word(dict_name: &str, words: Vec<&str>) -> PyResult<(String, bool)> {
 }
 */
 
+/// Break text into tokens using the deepcut CNN model (ONNX inference).
+///
+/// Uses the bundled ONNX model compiled from the original deepcut library.
+/// The model is loaded and compiled once on first call and then cached.
+///
+/// signature: (text: str) -> List[str]
+#[pyfunction]
+#[pyo3(signature = (text))]
+fn segment_deepcut(text: &str) -> PyResult<Vec<String>> {
+    if text.is_empty() {
+        return Ok(vec![]);
+    }
+    deepcut::tokenize(text).map_err(|e| {
+        exceptions::PyRuntimeError::new_err(format!(
+            "deepcut inference failed: {}",
+            e
+        ))
+    })
+}
+
 #[pymodule]
 fn _nlpo3_python_backend(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(load_dict, m)?)?;
     m.add_function(wrap_pyfunction!(segment, m)?)?;
+    m.add_function(wrap_pyfunction!(segment_deepcut, m)?)?;
     Ok(())
 }
