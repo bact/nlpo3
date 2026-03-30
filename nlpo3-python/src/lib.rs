@@ -192,11 +192,13 @@ impl PyDeepCutTokenizer {
     /// Break text into tokens using the deepcut CNN model.
     ///
     /// Thread-safe: multiple threads may call this on the same instance.
-    fn segment(&self, text: &str) -> Vec<String> {
+    fn segment(&self, text: &str) -> PyResult<Vec<String>> {
         if text.is_empty() {
-            return vec![];
+            return Ok(vec![]);
         }
-        self.inner.segment_to_string(text, false, false)
+        self.inner.tokenize(text).map_err(|e| {
+            exceptions::PyRuntimeError::new_err(format!("deepcut inference failed: {}", e))
+        })
     }
 }
 

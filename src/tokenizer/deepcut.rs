@@ -336,7 +336,7 @@ fn load_model_from_bytes(bytes: &[u8]) -> AnyResult<DeepCutModel> {
     // dtype-only fact and let tract infer both inputs freely.
     let shared_fact =
         if let Some(batch_tdim) = dims0.first().and_then(|d| d.concretize()) {
-            InferenceFact::dt_shape(f32::datum_type(), tvec![batch_tdim, 21usize.into()])
+            InferenceFact::dt_shape(f32::datum_type(), tvec![batch_tdim, N_PAD.into()])
         } else {
             InferenceFact::dt(f32::datum_type())
         };
@@ -528,7 +528,7 @@ impl Tokenizer for DeepCutTokenizer {
     }
 
     fn segment_to_string(&self, text: &str, safe: bool, parallel: bool) -> Vec<String> {
-        self.segment(text, safe, parallel).unwrap_or_default()
+        self.segment(text, safe, parallel).unwrap()
     }
 }
 
