@@ -3,9 +3,39 @@
 
 """Type stubs for _nlpo3_python_backend Rust extension module."""
 
-# pylint: disable=unused-argument,unnecessary-ellipsis
-
 from typing import List, Tuple
+
+class DeepCutTokenizer:
+    """Deepcut CNN-based Thai word tokenizer (Rust backend).
+
+    Each instance compiles and owns the ONNX model.  Cloning is cheap
+    (the compiled model is reference-counted).  The same instance is safe
+    to call from multiple threads simultaneously.
+
+    For distributed or parallel workloads, create one instance per worker
+    process to avoid sharing state across process boundaries.
+
+    Example::
+
+        from nlpo3 import DeepCutTokenizer
+
+        tokenizer = DeepCutTokenizer()
+        tokens = tokenizer.segment("ทดสอบการตัดคำ")
+    """
+
+    def __new__(cls) -> "DeepCutTokenizer": ...
+    def segment(self, text: str) -> List[str]:
+        """Break text into tokens using the deepcut CNN model.
+
+        Thread-safe: multiple threads may call this on the same instance.
+
+        Args:
+            text: Input text to segment
+
+        Returns:
+            List of tokens
+        """
+        ...
 
 def load_dict(file_path: str, dict_name: str) -> Tuple[str, bool]:
     """Load a dictionary file to a tokenizer.
@@ -49,8 +79,8 @@ def segment(
 def segment_deepcut(text: str) -> List[str]:
     """Break text into tokens using the deepcut CNN model.
 
-    Uses the bundled ONNX model from the deepcut library.
-    The model is loaded and compiled once on first call and then cached.
+    Uses a process-level lazy singleton for the model.  For distributed
+    or parallel workloads, use DeepCutTokenizer directly.
 
     Args:
         text: Input text to segment

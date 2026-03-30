@@ -14,14 +14,16 @@ from __future__ import annotations
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-# import from .so (Rust)
-from ._nlpo3_python_backend import load_dict as rust_load_dict  # pylint: disable=import-self
-from ._nlpo3_python_backend import segment as rust_segment  # pylint: disable=import-self
-from ._nlpo3_python_backend import (  # pylint: disable=import-self
-    segment_deepcut as rust_segment_deepcut,
-)
+# Imports from the compiled Rust extension module.
+from ._nlpo3_python_backend import DeepCutTokenizer
+from ._nlpo3_python_backend import load_dict as rust_load_dict
+from ._nlpo3_python_backend import segment as rust_segment
+from ._nlpo3_python_backend import segment_deepcut as rust_segment_deepcut
 
-__all__ = ["load_dict", "segment", "segment_deepcut"]
+# deepcut.py handles missing numpy/onnxruntime gracefully at import time.
+from .deepcut import segment_deepcut as _py_segment_deepcut
+
+__all__ = ["DeepCutTokenizer", "load_dict", "segment", "segment_deepcut"]
 
 # TODO: load_dict from in-memory list of words
 
@@ -85,10 +87,13 @@ def segment_deepcut(
 
     Uses a deep learning model (CNN) originally from the deepcut library,
     ported to ONNX format via LEKCut.  The default model is bundled and
-    runs via the Rust ONNX engine (tract).
+    runs via the Rust ONNX engine (tract) without any extra dependencies.
 
     When ``model_path`` or ``providers`` are specified, the Python
     implementation is used instead (requires ``pip install nlpo3[deepcut]``).
+
+    For distributed or parallel workloads, prefer :class:`DeepCutTokenizer`
+    so that each worker process owns and controls its own model instance.
 
     :param text: Input text
     :type text: str
@@ -107,11 +112,12 @@ def segment_deepcut(
         return []
 
     if model_path is not None or providers is not None:
-        # Lazy import: numpy/onnxruntime are optional dependencies.
-        from .deepcut import segment_deepcut as py_segment_deepcut  # pylint: disable=import-outside-toplevel
-
+        # Use the Python/onnxruntime path for custom models or providers.
+        kwargs: dict = {}
         if model_path is not None:
-            return py_segment_deepcut(text, model_path=model_path, providers=providers)
-        return py_segment_deepcut(text, providers=providers)
+            kwargs["model_path"] = model_path
+        if providers is not None:
+            kwargs["providers"] = providers
+        return _py_segment_deepcut(text, **kwargs)
 
     return rust_segment_deepcut(text)

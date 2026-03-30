@@ -16,6 +16,7 @@
 
 use std::collections::HashMap;
 use std::io::Cursor;
+use std::sync::Arc;
 
 use anyhow::Result as AnyResult;
 use lazy_static::lazy_static;
@@ -42,7 +43,7 @@ type DeepCutModel =
     RunnableModel<TypedFact, Box<dyn TypedOp>, Graph<TypedFact, Box<dyn TypedOp>>>;
 
 // ---------------------------------------------------------------------------
-// Vocabulary tables
+// Vocabulary tables (constant data; shared across all instances)
 // ---------------------------------------------------------------------------
 
 fn build_chars_map() -> HashMap<char, u32> {
@@ -249,17 +250,46 @@ fn build_char_type_map() -> HashMap<char, u32> {
     // Type indices: b_e=0, c=1, d=2, n=3, o=4(fallback), p=5, q=6,
     //               s=7, s_e=8, t=9, v=10, w=11
     let type_groups: &[(&str, u32)] = &[
-        ("กขฃคฆงจชซญฎฏฐฑฒณดตถทธนบปพฟภมยรลวศษสฬอ", 1), // c
-        ("ฅฉผฟฌหฮ", 3),                                    // n
-        ("ะาำิีืึุู", 10),                                // v
-        ("เแโใไ", 11),                                     // w
-        ("่้๊๋", 9),                                       // t
-        ("์ๆฯ.", 7),                                       // s
-        ("0123456789๑๒๓๔๕๖๗๘๙", 2),                       // d
-        ("\"\u{2018}\u{2019}'", 6),                        // q (quotes)
-        (" ", 5),                                           // p (space)
-        ("abcdefghijklmnopqrstuvwxyz", 8),                 // s_e
-        ("ABCDEFGHIJKLMNOPQRSTUVWXYZ", 0),                 // b_e
+        // c (1) — common Thai consonants
+        // กขฃคฆงจชซญฎฏฐฑฒณดตถทธนบปพฟภมยรลวศษสฬอ
+        (
+            "\u{0E01}\u{0E02}\u{0E03}\u{0E04}\u{0E06}\u{0E07}\u{0E08}\
+             \u{0E0A}\u{0E0B}\u{0E0D}\u{0E0E}\u{0E0F}\u{0E10}\u{0E11}\
+             \u{0E12}\u{0E13}\u{0E14}\u{0E15}\u{0E16}\u{0E17}\u{0E18}\
+             \u{0E19}\u{0E1A}\u{0E1B}\u{0E1E}\u{0E1F}\u{0E20}\u{0E21}\
+             \u{0E22}\u{0E23}\u{0E25}\u{0E27}\u{0E28}\u{0E29}\u{0E2A}\
+             \u{0E2C}\u{0E2D}",
+            1,
+        ),
+        // n (3) — rare Thai consonants: ฅฉผฟฌหฮ
+        ("\u{0E05}\u{0E09}\u{0E1C}\u{0E1F}\u{0E0C}\u{0E2B}\u{0E2E}", 3),
+        // v (10) — Thai vowels: ะาำิีืึุู
+        (
+            "\u{0E30}\u{0E32}\u{0E33}\u{0E34}\u{0E35}\u{0E37}\u{0E36}\
+             \u{0E38}\u{0E39}",
+            10,
+        ),
+        // w (11) — leading Thai vowels: เแโใไ
+        ("\u{0E40}\u{0E41}\u{0E42}\u{0E43}\u{0E44}", 11),
+        // t (9) — Thai tone marks: ่้๊๋
+        ("\u{0E48}\u{0E49}\u{0E4A}\u{0E4B}", 9),
+        // s (7) — Thai symbols and period: ์ๆฯ.
+        ("\u{0E4C}\u{0E46}\u{0E2F}.", 7),
+        // d (2) — digits: 0-9 and Thai digits ๑๒๓๔๕๖๗๘๙
+        (
+            "0123456789\
+             \u{0E51}\u{0E52}\u{0E53}\u{0E54}\u{0E55}\u{0E56}\u{0E57}\
+             \u{0E58}\u{0E59}",
+            2,
+        ),
+        // q (6) — quotation marks: " ' \u{2018} \u{2019}
+        ("\"\u{2018}\u{2019}'", 6),
+        // p (5) — space
+        (" ", 5),
+        // s_e (8) — lowercase Latin
+        ("abcdefghijklmnopqrstuvwxyz", 8),
+        // b_e (0) — uppercase Latin
+        ("ABCDEFGHIJKLMNOPQRSTUVWXYZ", 0),
     ];
     let mut map = HashMap::new();
     for (group, type_idx) in type_groups {
@@ -270,11 +300,17 @@ fn build_char_type_map() -> HashMap<char, u32> {
     map
 }
 
+// Vocabulary maps are constant and shared across all tokenizer instances.
+lazy_static! {
+    static ref CHARS_MAP: HashMap<char, u32> = build_chars_map();
+    static ref CHAR_TYPE_MAP: HashMap<char, u32> = build_char_type_map();
+}
+
 // ---------------------------------------------------------------------------
 // Model loading
 // ---------------------------------------------------------------------------
 
-/// Load and compile the deepcut ONNX model.
+/// Load and compile the deepcut ONNX model from the embedded bytes.
 ///
 /// The two ONNX model inputs carry different symbolic batch dimensions.
 /// We unify them with the same `TDim` (taken from input 0) so that the
@@ -310,13 +346,6 @@ fn load_model() -> AnyResult<DeepCutModel> {
         .map_err(|e| anyhow::anyhow!("deepcut: model optimization failed: {}", e))?
         .into_runnable()
         .map_err(|e| anyhow::anyhow!("deepcut: model compilation failed: {}", e))
-}
-
-lazy_static! {
-    static ref CHARS_MAP: HashMap<char, u32> = build_chars_map();
-    static ref CHAR_TYPE_MAP: HashMap<char, u32> = build_char_type_map();
-    static ref MODEL: DeepCutModel =
-        load_model().expect("deepcut: ONNX model initialization failed");
 }
 
 // ---------------------------------------------------------------------------
@@ -366,9 +395,12 @@ fn build_features(text_chars: &[char]) -> (Vec<f32>, Vec<f32>) {
 
 /// Deepcut CNN-based Thai word tokenizer.
 ///
-/// Tokenizes using a bundled ONNX model compiled from the original
-/// deepcut library.  The model is loaded and compiled once on first use
-/// and then cached for subsequent calls.
+/// Each instance compiles and owns the ONNX model.  Cloning is cheap because
+/// the compiled model is reference-counted with [`Arc`].  Both `Send` and
+/// `Sync` are satisfied, so the same instance may be shared across threads.
+///
+/// For distributed or parallel workloads, create one `DeepCutTokenizer` per
+/// worker process; do not rely on any process-level singleton.
 ///
 /// # Example
 ///
@@ -376,25 +408,94 @@ fn build_features(text_chars: &[char]) -> (Vec<f32>, Vec<f32>) {
 /// use nlpo3::tokenizer::deepcut::DeepCutTokenizer;
 /// use nlpo3::tokenizer::tokenizer_trait::Tokenizer;
 ///
-/// let tokenizer = DeepCutTokenizer::new();
+/// let tokenizer = DeepCutTokenizer::new().unwrap();
 /// let tokens = tokenizer.segment_to_string("ทดสอบการตัดคำ", false, false);
 /// assert!(!tokens.is_empty());
 /// assert_eq!(tokens.join(""), "ทดสอบการตัดคำ");
 /// ```
-pub struct DeepCutTokenizer;
+#[derive(Clone)]
+pub struct DeepCutTokenizer {
+    /// Reference-counted compiled model.  Cloning the tokenizer is O(1).
+    model: Arc<DeepCutModel>,
+}
 
 impl DeepCutTokenizer {
     /// Create a new `DeepCutTokenizer`.
     ///
-    /// The underlying ONNX model is loaded lazily on first use.
-    pub fn new() -> Self {
-        DeepCutTokenizer
+    /// Compiles the bundled ONNX model on first call.  For repeated use
+    /// within the same process, prefer to create a single instance and reuse
+    /// it (or clone it cheaply with [`Clone`]).
+    pub fn new() -> AnyResult<Self> {
+        Ok(DeepCutTokenizer {
+            model: Arc::new(load_model()?),
+        })
+    }
+
+    /// Tokenize `text`, returning word tokens.
+    ///
+    /// Inference is thread-safe: `tract` creates independent computation state
+    /// per call, so multiple threads may call this concurrently on the same
+    /// instance.
+    pub fn tokenize(&self, text: &str) -> AnyResult<Vec<String>> {
+        if text.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let text_chars: Vec<char> = text.chars().collect();
+        let n = text_chars.len();
+
+        let (x_char_flat, x_type_flat) = build_features(&text_chars);
+
+        let x_char =
+            tract_ndarray::Array2::<f32>::from_shape_vec((n, N_PAD), x_char_flat)
+                .map_err(|e| anyhow::anyhow!("deepcut: failed to build x_char array: {}", e))?;
+        let x_type =
+            tract_ndarray::Array2::<f32>::from_shape_vec((n, N_PAD), x_type_flat)
+                .map_err(|e| anyhow::anyhow!("deepcut: failed to build x_type array: {}", e))?;
+
+        let outputs = self
+            .model
+            .run(tvec![
+                x_char.into_tensor().into(),
+                x_type.into_tensor().into(),
+            ])
+            .map_err(|e| anyhow::anyhow!("deepcut: ONNX inference failed: {}", e))?;
+
+        let probs: Vec<f32> = outputs[0]
+            .to_array_view::<f32>()
+            .map_err(|e| anyhow::anyhow!("deepcut: failed to read model output: {}", e))?
+            .iter()
+            .copied()
+            .collect();
+
+        // Mirror the Python segmentation logic:
+        //   y_predict = (probs > threshold).astype(int)
+        //   word_end  = y_predict[1:].tolist() + [1]
+        let word_end: Vec<bool> = probs[1..]
+            .iter()
+            .map(|&p| p > WORD_BOUNDARY_THRESHOLD)
+            .chain(std::iter::once(true))
+            .collect();
+
+        let mut tokens: Vec<String> = Vec::new();
+        let mut current = String::new();
+        for (&ch, &is_end) in text_chars.iter().zip(word_end.iter()) {
+            current.push(ch);
+            if is_end {
+                tokens.push(std::mem::take(&mut current));
+            }
+        }
+        if !current.is_empty() {
+            tokens.push(current);
+        }
+
+        Ok(tokens)
     }
 }
 
 impl Default for DeepCutTokenizer {
     fn default() -> Self {
-        DeepCutTokenizer::new()
+        DeepCutTokenizer::new().expect("deepcut: ONNX model initialization failed")
     }
 }
 
@@ -404,70 +505,12 @@ impl Tokenizer for DeepCutTokenizer {
     /// The `safe` and `parallel` flags are accepted for API compatibility
     /// but have no effect on deepcut inference.
     fn segment(&self, text: &str, _safe: bool, _parallel: bool) -> AnyResult<Vec<String>> {
-        tokenize(text)
+        self.tokenize(text)
     }
 
     fn segment_to_string(&self, text: &str, safe: bool, parallel: bool) -> Vec<String> {
         self.segment(text, safe, parallel).unwrap_or_default()
     }
-}
-
-/// Tokenize Thai text using the bundled deepcut ONNX model.
-///
-/// Returns `Ok(vec![])` for empty input and propagates ONNX errors.
-pub fn tokenize(text: &str) -> AnyResult<Vec<String>> {
-    if text.is_empty() {
-        return Ok(vec![]);
-    }
-
-    let text_chars: Vec<char> = text.chars().collect();
-    let n = text_chars.len();
-
-    let (x_char_flat, x_type_flat) = build_features(&text_chars);
-
-    let x_char =
-        tract_ndarray::Array2::<f32>::from_shape_vec((n, N_PAD), x_char_flat)
-            .map_err(|e| anyhow::anyhow!("deepcut: failed to build x_char array: {}", e))?;
-    let x_type =
-        tract_ndarray::Array2::<f32>::from_shape_vec((n, N_PAD), x_type_flat)
-            .map_err(|e| anyhow::anyhow!("deepcut: failed to build x_type array: {}", e))?;
-
-    let outputs = MODEL
-        .run(tvec![
-            x_char.into_tensor().into(),
-            x_type.into_tensor().into(),
-        ])
-        .map_err(|e| anyhow::anyhow!("deepcut: ONNX inference failed: {}", e))?;
-
-    let probs: Vec<f32> = outputs[0]
-        .to_array_view::<f32>()
-        .map_err(|e| anyhow::anyhow!("deepcut: failed to read model output: {}", e))?
-        .iter()
-        .copied()
-        .collect();
-
-    // Mirror the Python segmentation logic:
-    //   y_predict = (probs > threshold).astype(int)
-    //   word_end  = y_predict[1:].tolist() + [1]
-    let word_end: Vec<bool> = probs[1..]
-        .iter()
-        .map(|&p| p > WORD_BOUNDARY_THRESHOLD)
-        .chain(std::iter::once(true))
-        .collect();
-
-    let mut tokens: Vec<String> = Vec::new();
-    let mut current = String::new();
-    for (&ch, &is_end) in text_chars.iter().zip(word_end.iter()) {
-        current.push(ch);
-        if is_end {
-            tokens.push(std::mem::take(&mut current));
-        }
-    }
-    if !current.is_empty() {
-        tokens.push(current);
-    }
-
-    Ok(tokens)
 }
 
 // ---------------------------------------------------------------------------
@@ -478,15 +521,19 @@ pub fn tokenize(text: &str) -> AnyResult<Vec<String>> {
 mod tests {
     use super::*;
 
+    fn tok() -> DeepCutTokenizer {
+        DeepCutTokenizer::new().expect("model should load")
+    }
+
     #[test]
     fn test_empty_input() {
-        assert_eq!(tokenize("").unwrap(), Vec::<String>::new());
+        assert_eq!(tok().tokenize("").unwrap(), Vec::<String>::new());
     }
 
     #[test]
     fn test_basic_thai_roundtrip() {
         let text = "ทดสอบการตัดคำ";
-        let tokens = tokenize(text).unwrap();
+        let tokens = tok().tokenize(text).unwrap();
         assert!(!tokens.is_empty());
         assert_eq!(tokens.join(""), text);
     }
@@ -494,15 +541,26 @@ mod tests {
     #[test]
     fn test_mixed_thai_latin_roundtrip() {
         let text = "หมอนทองตากลมหูว์MBK39";
-        let tokens = tokenize(text).unwrap();
+        let tokens = tok().tokenize(text).unwrap();
         assert_eq!(tokens.join(""), text);
     }
 
     #[test]
-    fn test_tokenizer_struct() {
-        let tok = DeepCutTokenizer::new();
+    fn test_tokenizer_trait() {
+        let tok = DeepCutTokenizer::new().expect("model should load");
         let tokens = tok.segment_to_string("ทดสอบ", false, false);
         assert!(!tokens.is_empty());
         assert_eq!(tokens.join(""), "ทดสอบ");
+    }
+
+    #[test]
+    fn test_clone_shares_model() {
+        let tok1 = tok();
+        let tok2 = tok1.clone();
+        // Both should tokenize identically.
+        assert_eq!(
+            tok1.tokenize("ทดสอบ").unwrap(),
+            tok2.tokenize("ทดสอบ").unwrap()
+        );
     }
 }

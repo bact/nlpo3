@@ -339,9 +339,6 @@ class _DeepCutTokenizer:
         return tokens
 
 
-_DEFAULT_TOKENIZER: Optional[_DeepCutTokenizer] = None
-
-
 def segment_deepcut(
     text: str,
     model_path: str = _DEFAULT_MODEL_PATH,
@@ -351,6 +348,10 @@ def segment_deepcut(
 
     Uses a deep learning model (CNN) originally from the deepcut library,
     ported to ONNX format via LEKCut.
+
+    A new tokenizer instance is created on every call.  For repeated use,
+    create a :class:`_DeepCutTokenizer` instance and call
+    :meth:`_DeepCutTokenizer.tokenize` directly.
 
     :param text: Input text
     :type text: str
@@ -365,17 +366,9 @@ def segment_deepcut(
     :return: List of tokens
     :rtype: List[str]
     """
-    global _DEFAULT_TOKENIZER
-
     if not text or not isinstance(text, str):
         return []
 
     _check_deps()
-
-    if providers is None and model_path == _DEFAULT_MODEL_PATH:
-        # Use the cached tokenizer for the default model.
-        if _DEFAULT_TOKENIZER is None:
-            _DEFAULT_TOKENIZER = _DeepCutTokenizer()
-        return _DEFAULT_TOKENIZER.tokenize(text)
 
     return _DeepCutTokenizer(model_path=model_path, providers=providers).tokenize(text)

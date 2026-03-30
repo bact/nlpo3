@@ -84,3 +84,15 @@ target = "nlpo3._nlpo3_python_backend"
 path = "Cargo.toml"
 binding = "PyO3"
 strip = "No"
+
+[tool.pylint.main]
+# Exclude type-stub files: pylint does not fully understand .pyi semantics
+# (e.g. the mandatory use of ... as function bodies and declared-but-unused
+# stub arguments).
+ignore-patterns = [".*\\.pyi$"]
+
+[tool.pylint.typecheck]
+# Tell pylint that _nlpo3_python_backend is a compiled C extension so that it
+# does not attempt to import it at lint time (which would fail) and does not
+# raise W0406 (import-self) for relative imports inside the nlpo3 package.
+extension-pkg-allow-list = ["nlpo3._nlpo3_python_backend"]

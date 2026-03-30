@@ -14,7 +14,7 @@ use std::sync::Mutex;
 
 use ahash::AHashMap as HashMap;
 use lazy_static::lazy_static;
-use nlpo3::tokenizer::deepcut;
+use nlpo3::tokenizer::deepcut::DeepCutTokenizer;
 use nlpo3::tokenizer::newmm::NewmmTokenizer;
 use nlpo3::tokenizer::tokenizer_trait::Tokenizer;
 use pyo3::prelude::*;
@@ -24,6 +24,12 @@ use pyo3::{exceptions, wrap_pyfunction};
 lazy_static! {
     static ref TOKENIZER_COLLECTION: Mutex<HashMap<String, Box<NewmmTokenizer>>> =
         Mutex::new(HashMap::new());
+    /// Process-level singleton for the `segment_deepcut` convenience function.
+    /// Initialised once on first call; read-only thereafter.
+    /// Users who need per-instance control (e.g. distributed workloads) should
+    /// create `DeepCutTokenizer()` instances directly instead.
+    static ref DEEPCUT_SINGLETON: DeepCutTokenizer =
+        DeepCutTokenizer::new().expect("deepcut: ONNX model initialisation failed");
 }
 
 /// Load a dictionary file to a tokenizer,
@@ -124,10 +130,68 @@ fn remove_word(dict_name: &str, words: Vec<&str>) -> PyResult<(String, bool)> {
 }
 */
 
+// ---------------------------------------------------------------------------
+// Deepcut Python class
+// ---------------------------------------------------------------------------
+
+/// Deepcut CNN-based Thai word tokenizer (Python class).
+///
+/// Each instance compiles and owns the ONNX model.  Cloning is cheap
+/// (the compiled model is reference-counted).  The same instance is safe to
+/// call from multiple threads simultaneously.
+///
+/// For distributed or parallel workloads, create one `DeepCutTokenizer` per
+/// worker process to avoid sharing mutable state across process boundaries.
+///
+/// ```python
+/// from nlpo3 import DeepCutTokenizer
+///
+/// tokenizer = DeepCutTokenizer()
+/// tokens = tokenizer.segment("ทดสอบการตัดคำ")
+/// # ['ทดสอบ', 'การ', 'ตัด', 'คำ']
+/// ```
+#[pyclass(name = "DeepCutTokenizer")]
+struct PyDeepCutTokenizer {
+    inner: DeepCutTokenizer,
+}
+
+#[pymethods]
+impl PyDeepCutTokenizer {
+    /// Create a new DeepCutTokenizer, compiling the bundled ONNX model.
+    #[new]
+    fn new() -> PyResult<Self> {
+        DeepCutTokenizer::new()
+            .map(|inner| PyDeepCutTokenizer { inner })
+            .map_err(|e| {
+                exceptions::PyRuntimeError::new_err(format!(
+                    "deepcut: failed to create tokenizer: {}",
+                    e
+                ))
+            })
+    }
+
+    /// Break text into tokens using the deepcut CNN model.
+    ///
+    /// Thread-safe: multiple threads may call this on the same instance.
+    fn segment(&self, text: &str) -> Vec<String> {
+        if text.is_empty() {
+            return vec![];
+        }
+        self.inner.segment_to_string(text, false, false)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Deepcut convenience function
+// ---------------------------------------------------------------------------
+
 /// Break text into tokens using the deepcut CNN model (ONNX inference).
 ///
-/// Uses the bundled ONNX model from the deepcut library.
-/// The model is loaded and compiled once on first call and then cached.
+/// Uses a process-level lazy singleton for the model.  The singleton is
+/// initialised once, is read-only thereafter, and is safe for concurrent use.
+///
+/// For distributed or parallel workloads where each worker should own its
+/// model, use `DeepCutTokenizer` directly instead.
 ///
 /// signature: (text: str) -> List[str]
 #[pyfunction]
@@ -136,9 +200,11 @@ fn segment_deepcut(text: &str) -> PyResult<Vec<String>> {
     if text.is_empty() {
         return Ok(vec![]);
     }
-    deepcut::tokenize(text).map_err(|e| {
-        exceptions::PyRuntimeError::new_err(format!("deepcut inference failed: {}", e))
-    })
+    DEEPCUT_SINGLETON
+        .tokenize(text)
+        .map_err(|e| {
+            exceptions::PyRuntimeError::new_err(format!("deepcut inference failed: {}", e))
+        })
 }
 
 #[pymodule]
@@ -146,5 +212,6 @@ fn _nlpo3_python_backend(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(load_dict, m)?)?;
     m.add_function(wrap_pyfunction!(segment, m)?)?;
     m.add_function(wrap_pyfunction!(segment_deepcut, m)?)?;
+    m.add_class::<PyDeepCutTokenizer>()?;
     Ok(())
 }
