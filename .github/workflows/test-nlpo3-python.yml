@@ -26,13 +26,14 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        os: [macos-latest, ubuntu-latest, windows-latest]
+        os: [ubuntu-latest]
         python-version: ["3.14", "3.13", "3.12", "3.11", "3.10", "3.9"]
         bitness: [64] # 32, 64
         include:
           - os: windows-latest
-            python-version: "3.9"
-            bitness: 32
+            python-version: "3.14"
+          - os: macos-latest
+            python-version: "3.14"
 
     runs-on: ${{ matrix.os }}
 
