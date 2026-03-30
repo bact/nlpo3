@@ -214,16 +214,13 @@ impl FstDictionary {
         }
 
         // --- delta additions ---
-        let text_bytes = text.as_bytes();
-        // Walk through all byte prefixes of text, checking additions.
+        // Walk through all character-boundary prefixes of text, checking additions.
         let mut byte_pos = 0;
         let mut char_pos = 0;
         for ch in text.chars() {
             byte_pos += ch.len_utf8();
             char_pos += 1;
             let prefix = &text[..byte_pos];
-            // Only check byte-aligned UTF-8 prefixes (all of them are, by construction).
-            let _ = text_bytes; // suppress unused warning
             if self.additions.contains(prefix) {
                 result.push(char_pos);
             }

@@ -39,7 +39,7 @@ impl CharString {
     /// Create a new `CharString` from a UTF-8 string slice.
     pub fn new(s: &str) -> Self {
         let source = Arc::new(s.to_string());
-        let mut positions: Vec<u32> = Vec::with_capacity(s.len() + 1);
+        let mut positions: Vec<u32> = Vec::with_capacity(s.chars().count() + 1);
         for (byte_pos, _ch) in s.char_indices() {
             positions.push(byte_pos as u32);
         }
