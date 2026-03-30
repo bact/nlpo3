@@ -22,6 +22,9 @@ use anyhow::Result as AnyResult;
 use lazy_static::lazy_static;
 use ndarray::Array2;
 use tract_onnx::prelude::*;
+// `Factoid` is a trait that provides the `concretize()` method used in
+// `load_model_from_bytes()` to extract the batch `TDim` from the inference
+// model's input fact.
 use tract_onnx::tract_hir::infer::Factoid;
 
 use super::tokenizer_trait::Tokenizer;

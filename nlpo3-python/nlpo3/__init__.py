@@ -15,10 +15,12 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 
 # Imports from the compiled Rust extension module.
+# pylint: disable=import-error  # _nlpo3_python_backend requires a build step
 from ._nlpo3_python_backend import DeepCutTokenizer
 from ._nlpo3_python_backend import load_dict as rust_load_dict
 from ._nlpo3_python_backend import segment as rust_segment
 from ._nlpo3_python_backend import segment_deepcut as rust_segment_deepcut
+# pylint: enable=import-error
 
 __all__ = ["DeepCutTokenizer", "load_dict", "segment", "segment_deepcut"]
 
