@@ -15,9 +15,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `segment_deepcut()` function for Thai word tokenization using the deepcut
-  deep learning model (CNN) via ONNX inference. The model is bundled with
-  the package. Optional dependencies `numpy` and `onnxruntime` are required
-  and can be installed with `pip install nlpo3[deepcut]`.
+  deep learning model (CNN) via ONNX inference.  The model is bundled with
+  the package and runs via the pure-Rust `tract-onnx` engine with no
+  additional dependencies.  Custom model paths and ONNX Runtime execution
+  providers are also supported via the optional Python path
+  (`pip install nlpo3[deepcut]`).
   The deepcut model and its ONNX port originate from
   [Deepcut](https://github.com/rkcosmos/deepcut) and
   [LEKCut](https://github.com/PyThaiNLP/LEKCut).
+- `DeepCutTokenizer` struct in the core `nlpo3` Rust crate
+  (`src/tokenizer/deepcut`), implementing the `Tokenizer` trait.
+  Enabled with the `deepcut` Cargo feature.

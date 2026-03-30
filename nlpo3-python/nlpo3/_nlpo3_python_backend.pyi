@@ -3,6 +3,8 @@
 
 """Type stubs for _nlpo3_python_backend Rust extension module."""
 
+# pylint: disable=unused-argument,unnecessary-ellipsis
+
 from typing import List, Tuple
 
 def load_dict(file_path: str, dict_name: str) -> Tuple[str, bool]:
@@ -41,5 +43,22 @@ def segment(
 
     Raises:
         RuntimeError: If dictionary name does not exist
+    """
+    ...
+
+def segment_deepcut(text: str) -> List[str]:
+    """Break text into tokens using the deepcut CNN model.
+
+    Uses the bundled ONNX model from the deepcut library.
+    The model is loaded and compiled once on first call and then cached.
+
+    Args:
+        text: Input text to segment
+
+    Returns:
+        List of tokens
+
+    Raises:
+        RuntimeError: If ONNX inference fails
     """
     ...

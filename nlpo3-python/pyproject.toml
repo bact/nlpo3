@@ -43,6 +43,10 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
+# numpy and onnxruntime are only needed for the Python fallback path
+# (custom model_path or custom providers).  The default deepcut
+# tokenizer runs via the bundled Rust tract-onnx backend with no
+# additional Python dependencies.
 deepcut = [
   "numpy>=1.21",
   "onnxruntime>=1.10",

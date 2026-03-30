@@ -41,10 +41,8 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 ahash = "0.8"
-anyhow = "1.0"
 lazy_static = "1.5"
-nlpo3 = "1.4"
-tract-onnx = "0.21"
+nlpo3 = { version = "1.4", path = "..", features = ["deepcut"] }
 
 [dependencies.pyo3]
 version = "0.27"

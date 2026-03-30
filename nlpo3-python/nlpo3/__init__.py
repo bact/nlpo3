@@ -15,9 +15,11 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 
 # import from .so (Rust)
-from ._nlpo3_python_backend import load_dict as rust_load_dict
-from ._nlpo3_python_backend import segment as rust_segment
-from ._nlpo3_python_backend import segment_deepcut as rust_segment_deepcut
+from ._nlpo3_python_backend import load_dict as rust_load_dict  # pylint: disable=import-self
+from ._nlpo3_python_backend import segment as rust_segment  # pylint: disable=import-self
+from ._nlpo3_python_backend import (  # pylint: disable=import-self
+    segment_deepcut as rust_segment_deepcut,
+)
 
 __all__ = ["load_dict", "segment", "segment_deepcut"]
 
@@ -105,10 +107,11 @@ def segment_deepcut(
         return []
 
     if model_path is not None or providers is not None:
-        # Fall back to the Python implementation for custom models/providers.
-        from .deepcut import segment_deepcut as py_segment_deepcut
+        # Lazy import: numpy/onnxruntime are optional dependencies.
+        from .deepcut import segment_deepcut as py_segment_deepcut  # pylint: disable=import-outside-toplevel
 
-        return py_segment_deepcut(text, model_path=model_path, providers=providers)
+        if model_path is not None:
+            return py_segment_deepcut(text, model_path=model_path, providers=providers)
+        return py_segment_deepcut(text, providers=providers)
 
     return rust_segment_deepcut(text)
-

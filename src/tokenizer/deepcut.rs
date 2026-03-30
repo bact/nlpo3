@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: 2024 PyThaiNLP Project
 // SPDX-License-Identifier: Apache-2.0
 
-//! Deepcut Thai word tokenizer — Rust implementation using ONNX inference
-//! via the pure-Rust `tract-onnx` engine.
+//! Deepcut Thai word tokenizer using ONNX inference via the pure-Rust
+//! `tract-onnx` engine.
 //!
 //! Based on LEKCut <https://github.com/PyThaiNLP/LEKCut>
 //! and Deepcut <https://github.com/rkcosmos/deepcut>.
@@ -11,35 +11,44 @@
 //! Rakpong Kittinaradorn, Titipat Achakulvisut, Korakot Chaovavanich,
 //! Kittinan Srithaworn, Pattarawat Chormai, Chanwit Kaewkasi,
 //! Tulakan Ruangrong, Krichkorn Oparad.
+//!
 //! Original deepcut license: MIT License.
 
 use std::collections::HashMap;
 use std::io::Cursor;
 
+use anyhow::Result as AnyResult;
 use lazy_static::lazy_static;
 use tract_onnx::prelude::*;
 use tract_onnx::tract_hir::infer::Factoid;
 
-/// Bundled deepcut ONNX model bytes.
-const MODEL_BYTES: &[u8] = include_bytes!("../nlpo3/model/deepcut.onnx");
+use super::tokenizer_trait::Tokenizer;
 
-/// Context window size (characters each side + current = 21).
+/// Bundled deepcut ONNX model weights.
+const MODEL_BYTES: &[u8] = include_bytes!("../../model/deepcut.onnx");
+
+/// Context window width (forward context + current + backward context = 21).
 const N_PAD: usize = 21;
-/// Half the context window: (21 - 1) / 2 = 10.
+/// Half-width of the context window: (21 - 1) / 2 = 10.
 const N_PAD_2: usize = (N_PAD - 1) / 2;
-/// Vocabulary index for unknown characters ("other" sentinel).
+/// Character-vocabulary index used for characters not in the vocabulary.
 const CHAR_INDEX_OTHER: u32 = 80;
-/// Type index for unknown character types ("o" = other).
+/// Character-type index used for types not in the type map.
 const CHAR_TYPE_INDEX_OTHER: u32 = 4;
-/// Probability threshold for word-boundary classification.
+/// Probability threshold for classifying a position as a word boundary.
 const WORD_BOUNDARY_THRESHOLD: f32 = 0.5;
 
 type DeepCutModel =
     RunnableModel<TypedFact, Box<dyn TypedOp>, Graph<TypedFact, Box<dyn TypedOp>>>;
 
+// ---------------------------------------------------------------------------
+// Vocabulary tables
+// ---------------------------------------------------------------------------
+
 fn build_chars_map() -> HashMap<char, u32> {
-    // Pairs of (single-char string, vocabulary index).
-    // Index 80 is the "other" sentinel (multi-char key, so not included here).
+    // Maps each character to its vocabulary index.
+    // Index 80 is the "other" sentinel (represented by the string "other",
+    // not a single character) so it is absent from this map.
     let entries: &[(&str, u32)] = &[
         ("\n", 0),
         (" ", 1),
@@ -121,7 +130,7 @@ fn build_chars_map() -> HashMap<char, u32> {
         ("m", 77),
         ("n", 78),
         ("o", 79),
-        // 80 = "other" sentinel — not a single char, so omitted from this map
+        // 80 = "other" sentinel — not a single char, absent from this map
         ("p", 81),
         ("q", 82),
         ("r", 83),
@@ -182,7 +191,7 @@ fn build_chars_map() -> HashMap<char, u32> {
         ("ฮ", 138),
         ("ฯ", 139),
         ("ะ", 140),
-        ("\u{0E31}", 141), // ั (sara a above, U+0E31)
+        ("\u{0E31}", 141), // ั  sara a above (U+0E31)
         ("า", 142),
         ("ำ", 143),
         ("ิ", 144),
@@ -236,8 +245,9 @@ fn build_chars_map() -> HashMap<char, u32> {
 }
 
 fn build_char_type_map() -> HashMap<char, u32> {
-    // (character group, type index)
-    // Type indices: b_e=0, c=1, d=2, n=3, o=4(fallback), p=5, q=6, s=7, s_e=8, t=9, v=10, w=11
+    // Maps each character to its type index.
+    // Type indices: b_e=0, c=1, d=2, n=3, o=4(fallback), p=5, q=6,
+    //               s=7, s_e=8, t=9, v=10, w=11
     let type_groups: &[(&str, u32)] = &[
         ("กขฃคฆงจชซญฎฏฐฑฒณดตถทธนบปพฟภมยรลวศษสฬอ", 1), // c
         ("ฅฉผฟฌหฮ", 3),                                    // n
@@ -260,24 +270,29 @@ fn build_char_type_map() -> HashMap<char, u32> {
     map
 }
 
-/// Load and compile the deepcut ONNX model using the same symbolic batch
-/// dimension for both inputs so the internal concat constraint is satisfied.
-fn load_model() -> anyhow::Result<DeepCutModel> {
+// ---------------------------------------------------------------------------
+// Model loading
+// ---------------------------------------------------------------------------
+
+/// Load and compile the deepcut ONNX model.
+///
+/// The two ONNX model inputs carry different symbolic batch dimensions.
+/// We unify them with the same `TDim` (taken from input 0) so that the
+/// internal concatenation constraint in the model is satisfied.
+fn load_model() -> AnyResult<DeepCutModel> {
     let inf_model = tract_onnx::onnx()
         .model_for_read(&mut Cursor::new(MODEL_BYTES))
         .map_err(|e| anyhow::anyhow!("deepcut: failed to read ONNX model: {}", e))?;
 
-    // The model's two inputs carry different symbolic batch dimensions.
-    // Unify them by assigning the same TDim (taken from input 0) to both.
     let dims0: Vec<_> = inf_model
         .input_fact(0)
-        .map_err(|e| anyhow::anyhow!("deepcut: failed to get input fact: {}", e))?
+        .map_err(|e| anyhow::anyhow!("deepcut: failed to read input fact 0: {}", e))?
         .shape
         .dims()
         .collect();
     let batch_tdim: TDim = dims0[0]
         .concretize()
-        .ok_or_else(|| anyhow::anyhow!("deepcut: batch dimension is not symbolic"))?;
+        .ok_or_else(|| anyhow::anyhow!("deepcut: batch dimension has no concrete value"))?;
     let shared_shape: TVec<TDim> = tvec![batch_tdim, 21usize.into()];
 
     inf_model
@@ -292,44 +307,47 @@ fn load_model() -> anyhow::Result<DeepCutModel> {
         )
         .map_err(|e| anyhow::anyhow!("deepcut: failed to set input fact 1: {}", e))?
         .into_optimized()
-        .map_err(|e| anyhow::anyhow!("deepcut: failed to optimize ONNX model: {}", e))?
+        .map_err(|e| anyhow::anyhow!("deepcut: model optimization failed: {}", e))?
         .into_runnable()
-        .map_err(|e| anyhow::anyhow!("deepcut: failed to compile ONNX model: {}", e))
+        .map_err(|e| anyhow::anyhow!("deepcut: model compilation failed: {}", e))
 }
 
 lazy_static! {
     static ref CHARS_MAP: HashMap<char, u32> = build_chars_map();
     static ref CHAR_TYPE_MAP: HashMap<char, u32> = build_char_type_map();
     static ref MODEL: DeepCutModel =
-        load_model().expect("deepcut: ONNX model failed to initialize");
+        load_model().expect("deepcut: ONNX model initialization failed");
 }
 
-/// Build the character-index and character-type feature arrays.
+// ---------------------------------------------------------------------------
+// Feature extraction
+// ---------------------------------------------------------------------------
+
+/// Build the character-index and character-type feature arrays for `text`.
 ///
-/// For each position `i` in the text the feature vector is:
-/// - 10 forward-context characters (i+1 … i+10)
-/// - 10 backward-context characters (i-1 … i-10, i.e. reversed)
-/// - 1 current character
-/// Total: 21 features per position.
+/// For each position `i` the 21-element feature vector is:
+///  - positions i+1 … i+10  (forward context, 10 chars)
+///  - positions i-10 … i-1  (backward context, reversed, 10 chars)
+///  - position i             (current character, 1 char)
 fn build_features(text_chars: &[char]) -> (Vec<f32>, Vec<f32>) {
     let n = text_chars.len();
 
-    // Padded sequence: N_PAD_2 spaces + text + N_PAD_2 spaces.
+    // Pad with spaces on both sides.
     let mut padded: Vec<char> = Vec::with_capacity(n + 2 * N_PAD_2);
-    padded.extend(std::iter::repeat(' ').take(N_PAD_2));
+    padded.extend(std::iter::repeat_n(' ', N_PAD_2));
     padded.extend_from_slice(text_chars);
-    padded.extend(std::iter::repeat(' ').take(N_PAD_2));
+    padded.extend(std::iter::repeat_n(' ', N_PAD_2));
 
     let mut x_char = Vec::with_capacity(n * N_PAD);
     let mut x_type = Vec::with_capacity(n * N_PAD);
 
     for i in N_PAD_2..(N_PAD_2 + n) {
-        // Forward context: padded[i+1 .. i+N_PAD_2+1]
+        // Forward context: positions i+1 … i+N_PAD_2
         for &ch in &padded[i + 1..i + N_PAD_2 + 1] {
             x_char.push(*CHARS_MAP.get(&ch).unwrap_or(&CHAR_INDEX_OTHER) as f32);
             x_type.push(*CHAR_TYPE_MAP.get(&ch).unwrap_or(&CHAR_TYPE_INDEX_OTHER) as f32);
         }
-        // Backward context (reversed): padded[i-N_PAD_2 .. i]
+        // Backward context (reversed): positions i-1 … i-N_PAD_2
         for &ch in padded[i - N_PAD_2..i].iter().rev() {
             x_char.push(*CHARS_MAP.get(&ch).unwrap_or(&CHAR_INDEX_OTHER) as f32);
             x_type.push(*CHAR_TYPE_MAP.get(&ch).unwrap_or(&CHAR_TYPE_INDEX_OTHER) as f32);
@@ -342,11 +360,62 @@ fn build_features(text_chars: &[char]) -> (Vec<f32>, Vec<f32>) {
     (x_char, x_type)
 }
 
+// ---------------------------------------------------------------------------
+// Public tokenizer
+// ---------------------------------------------------------------------------
+
+/// Deepcut CNN-based Thai word tokenizer.
+///
+/// Tokenizes using a bundled ONNX model compiled from the original
+/// deepcut library.  The model is loaded and compiled once on first use
+/// and then cached for subsequent calls.
+///
+/// # Example
+///
+/// ```rust
+/// use nlpo3::tokenizer::deepcut::DeepCutTokenizer;
+/// use nlpo3::tokenizer::tokenizer_trait::Tokenizer;
+///
+/// let tokenizer = DeepCutTokenizer::new();
+/// let tokens = tokenizer.segment_to_string("ทดสอบการตัดคำ", false, false);
+/// assert!(!tokens.is_empty());
+/// assert_eq!(tokens.join(""), "ทดสอบการตัดคำ");
+/// ```
+pub struct DeepCutTokenizer;
+
+impl DeepCutTokenizer {
+    /// Create a new `DeepCutTokenizer`.
+    ///
+    /// The underlying ONNX model is loaded lazily on first use.
+    pub fn new() -> Self {
+        DeepCutTokenizer
+    }
+}
+
+impl Default for DeepCutTokenizer {
+    fn default() -> Self {
+        DeepCutTokenizer::new()
+    }
+}
+
+impl Tokenizer for DeepCutTokenizer {
+    /// Tokenize `text` using the deepcut ONNX model.
+    ///
+    /// The `safe` and `parallel` flags are accepted for API compatibility
+    /// but have no effect on deepcut inference.
+    fn segment(&self, text: &str, _safe: bool, _parallel: bool) -> AnyResult<Vec<String>> {
+        tokenize(text)
+    }
+
+    fn segment_to_string(&self, text: &str, safe: bool, parallel: bool) -> Vec<String> {
+        self.segment(text, safe, parallel).unwrap_or_default()
+    }
+}
+
 /// Tokenize Thai text using the bundled deepcut ONNX model.
 ///
-/// Returns `Err` if ONNX inference fails.  Returns an empty `Vec` for empty
-/// or whitespace-only input.
-pub fn tokenize(text: &str) -> anyhow::Result<Vec<String>> {
+/// Returns `Ok(vec![])` for empty input and propagates ONNX errors.
+pub fn tokenize(text: &str) -> AnyResult<Vec<String>> {
     if text.is_empty() {
         return Ok(vec![]);
     }
@@ -372,12 +441,12 @@ pub fn tokenize(text: &str) -> anyhow::Result<Vec<String>> {
 
     let probs: Vec<f32> = outputs[0]
         .to_array_view::<f32>()
-        .map_err(|e| anyhow::anyhow!("deepcut: failed to extract output: {}", e))?
+        .map_err(|e| anyhow::anyhow!("deepcut: failed to read model output: {}", e))?
         .iter()
         .copied()
         .collect();
 
-    // Mirror the Python logic:
+    // Mirror the Python segmentation logic:
     //   y_predict = (probs > threshold).astype(int)
     //   word_end  = y_predict[1:].tolist() + [1]
     let word_end: Vec<bool> = probs[1..]
@@ -386,7 +455,7 @@ pub fn tokenize(text: &str) -> anyhow::Result<Vec<String>> {
         .chain(std::iter::once(true))
         .collect();
 
-    let mut tokens = Vec::new();
+    let mut tokens: Vec<String> = Vec::new();
     let mut current = String::new();
     for (&ch, &is_end) in text_chars.iter().zip(word_end.iter()) {
         current.push(ch);
@@ -401,6 +470,10 @@ pub fn tokenize(text: &str) -> anyhow::Result<Vec<String>> {
     Ok(tokens)
 }
 
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -411,16 +484,25 @@ mod tests {
     }
 
     #[test]
-    fn test_basic_thai() {
-        let tokens = tokenize("ทดสอบการตัดคำ").unwrap();
+    fn test_basic_thai_roundtrip() {
+        let text = "ทดสอบการตัดคำ";
+        let tokens = tokenize(text).unwrap();
         assert!(!tokens.is_empty());
-        assert_eq!(tokens.join(""), "ทดสอบการตัดคำ");
+        assert_eq!(tokens.join(""), text);
     }
 
     #[test]
-    fn test_mixed_thai_latin() {
+    fn test_mixed_thai_latin_roundtrip() {
         let text = "หมอนทองตากลมหูว์MBK39";
         let tokens = tokenize(text).unwrap();
         assert_eq!(tokens.join(""), text);
+    }
+
+    #[test]
+    fn test_tokenizer_struct() {
+        let tok = DeepCutTokenizer::new();
+        let tokens = tok.segment_to_string("ทดสอบ", false, false);
+        assert!(!tokens.is_empty());
+        assert_eq!(tokens.join(""), "ทดสอบ");
     }
 }

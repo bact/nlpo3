@@ -14,13 +14,12 @@ use std::sync::Mutex;
 
 use ahash::AHashMap as HashMap;
 use lazy_static::lazy_static;
+use nlpo3::tokenizer::deepcut;
 use nlpo3::tokenizer::newmm::NewmmTokenizer;
 use nlpo3::tokenizer::tokenizer_trait::Tokenizer;
 use pyo3::prelude::*;
 use pyo3::types::PyString;
 use pyo3::{exceptions, wrap_pyfunction};
-
-mod deepcut;
 
 lazy_static! {
     static ref TOKENIZER_COLLECTION: Mutex<HashMap<String, Box<NewmmTokenizer>>> =
@@ -127,7 +126,7 @@ fn remove_word(dict_name: &str, words: Vec<&str>) -> PyResult<(String, bool)> {
 
 /// Break text into tokens using the deepcut CNN model (ONNX inference).
 ///
-/// Uses the bundled ONNX model compiled from the original deepcut library.
+/// Uses the bundled ONNX model from the deepcut library.
 /// The model is loaded and compiled once on first call and then cached.
 ///
 /// signature: (text: str) -> List[str]
@@ -138,10 +137,7 @@ fn segment_deepcut(text: &str) -> PyResult<Vec<String>> {
         return Ok(vec![]);
     }
     deepcut::tokenize(text).map_err(|e| {
-        exceptions::PyRuntimeError::new_err(format!(
-            "deepcut inference failed: {}",
-            e
-        ))
+        exceptions::PyRuntimeError::new_err(format!("deepcut inference failed: {}", e))
     })
 }
 
