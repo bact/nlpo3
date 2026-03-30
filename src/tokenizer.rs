@@ -6,6 +6,6 @@ pub mod deepcut;
 mod dict_reader;
 pub mod fst_dict;
 pub mod newmm;
-pub(crate) mod tcc;
+pub mod tcc;
 pub mod tokenizer_trait;
-mod trie_char;
+pub mod trie_char;

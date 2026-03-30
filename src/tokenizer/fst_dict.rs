@@ -232,6 +232,31 @@ impl FstDictionary {
         result.dedup();
         result
     }
+
+    /// Return the number of bytes used by the immutable FST base set.
+    ///
+    /// This reflects the in-memory size of the compact automaton and can be
+    /// compared against the equivalent `HashMap`/trie memory to illustrate
+    /// the memory savings of the FST approach.
+    pub fn fst_size_bytes(&self) -> usize {
+        self.base.as_fst().as_bytes().len()
+    }
+
+    /// Return the total number of entries (base + additions − removals).
+    pub fn len(&self) -> usize {
+        use fst::Streamer;
+        let mut stream = self.base.stream();
+        let mut base_count: usize = 0;
+        while stream.next().is_some() {
+            base_count += 1;
+        }
+        base_count.saturating_sub(self.removals.len()) + self.additions.len()
+    }
+
+    /// Return `true` if the dictionary has no entries.
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }
 
 // ---------------------------------------------------------------------------

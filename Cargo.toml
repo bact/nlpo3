@@ -47,6 +47,13 @@ rustc-hash = "1.1"
 ndarray = { version = "0.16", optional = true }
 tract-onnx = { version = "0.21", optional = true }
 
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "tokenizer"
+harness = false
+
 [[test]]
 name = "basic"
 path = "tests/test_tokenizer.rs"
