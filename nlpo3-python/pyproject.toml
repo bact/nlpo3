@@ -80,7 +80,9 @@ ignore-patterns = [".*\\.pyi$"]
 [tool.pylint.typecheck]
 # _nlpo3_python_backend is a compiled Rust extension that requires a build
 # step not run during linting.  Suppress E0401 import-error for this module.
-ignored-modules = ["nlpo3._nlpo3_python_backend"]
+# Pylint resolves the relative import `from ._nlpo3_python_backend import ...`
+# under either name depending on context, so both forms are listed.
+ignored-modules = ["nlpo3._nlpo3_python_backend", "_nlpo3_python_backend"]
 
 [tool.setuptools]
 include-package-data = true

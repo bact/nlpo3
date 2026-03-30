@@ -32,17 +32,25 @@ pip install nlpo3
 ## Features
 
 - Thai word tokenizer
-  - `segment()` - use maximal-matching dictionary-based tokenization algorithm
-    and honor [Thai Character Cluster][tcc] boundaries
+  - `segment()` — maximal-matching dictionary-based tokenization
+    that honors [Thai Character Cluster][tcc] boundaries
     - [2.5x faster][benchmark]
       than similar pure Python implementation (PyThaiNLP's newmm)
-  - `load_dict()` - load a dictionary from a plain text file
+  - `load_dict()` — load a dictionary from a plain text file
     (one word per line)
+  - `segment_deepcut()` — CNN-based tokenization using the
+    [deepcut][deepcut] model (ONNX, embedded in the binary, no extra
+    Python dependencies)
+  - `DeepCutTokenizer` — class-based access to the deepcut model;
+    supports custom ONNX model paths and is safe to share across threads
 
 [tcc]: https://dl.acm.org/doi/10.1145/355214.355225
 [benchmark]: ./notebooks/nlpo3_segment_benchmarks.ipynb
+[deepcut]: https://github.com/rkcosmos/deepcut
 
 ## Use
+
+### Dictionary-based tokenizer
 
 Load a dictionary file and assign it a name (for example, `dict_name`).
 
@@ -75,6 +83,43 @@ word boundaries:
 ```python
 segment("สวัสดีครับ", dict_name="dict_name", safe=True)
 ```
+
+### Deepcut tokenizer
+
+Tokenize text using the bundled CNN-based deepcut model.
+No dictionary or additional Python dependencies are required.
+
+```python
+from nlpo3 import segment_deepcut
+
+segment_deepcut("สวัสดีครับ")
+```
+
+The function returns a list of strings, for example:
+
+```python
+['สวัสดี', 'ครับ']
+```
+
+Use the `DeepCutTokenizer` class to load a custom ONNX model or to reuse
+a single model instance across multiple calls (the same instance is safe
+to call from multiple threads):
+
+```python
+from nlpo3 import DeepCutTokenizer
+
+# Use the bundled default model
+tokenizer = DeepCutTokenizer()
+tokenizer.segment("สวัสดีครับ")
+
+# Use a custom model file
+tokenizer = DeepCutTokenizer(model_path="/path/to/custom.onnx")
+tokenizer.segment("สวัสดีครับ")
+```
+
+The deepcut model and its ONNX port originate from
+[Deepcut](https://github.com/rkcosmos/deepcut) and
+[LEKCut](https://github.com/PyThaiNLP/LEKCut).
 
 ### Dictionary
 

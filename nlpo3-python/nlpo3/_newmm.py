@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 from ._nlpo3_python_backend import load_dict as _rust_load_dict
 from ._nlpo3_python_backend import segment as _rust_segment
@@ -33,7 +33,7 @@ def load_dict(file_path: str, dict_name: str) -> Tuple[str, bool]:
 
 
 def segment(
-    text: str,
+    text: Optional[str],
     dict_name: str,
     safe: bool = False,
     parallel: bool = False,
@@ -42,8 +42,8 @@ def segment(
 
     Supports multithread mode via the parallel flag.
 
-    :param text: Input text
-    :type text: str
+    :param text: Input text. Returns an empty list for ``None`` or empty input.
+    :type text: str, optional
     :param dict_name: Dictionary name, as assigned in load_dict()
     :type dict_name: str
     :param safe: Use safe mode to avoid long waiting time in
