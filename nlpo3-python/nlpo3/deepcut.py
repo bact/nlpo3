@@ -340,7 +340,7 @@ class _DeepCutTokenizer:
 
 
 def segment_deepcut(
-    text: str,
+    text: Optional[str],
     model_path: str = _DEFAULT_MODEL_PATH,
     providers: Optional[List[str]] = None,
 ) -> List[str]:
