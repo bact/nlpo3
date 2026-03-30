@@ -1,19 +1,20 @@
-// SPDX-FileCopyrightText: 2024 PyThaiNLP Project
+// SPDX-FileCopyrightText: 2024-2026 PyThaiNLP Project
 // SPDX-License-Identifier: Apache-2.0
 
 /**
  * Dictionary-based maximal matching word segmentation, constrained with
  * Thai Character Cluster (TCC) boundaries.
- * 
+ *
  * The code is based on the notebooks created by Korakot Chaovavanich,
  * with heuristic graph size limit added to avoid exponential wait time.
- * 
+ *
  * :See Also:
  *  * \
  *   https://github.com/PyThaiNLP/pythainlp/blob/dev/pythainlp/tokenize/newmm.py
- * 
- * Rust implementation: ["Thanathip Suntorntip"]
-*/
+ *
+ * Original Rust implementation: Thanathip Suntorntip
+ * Rewrite using native Rust Unicode types: PyThaiNLP Project
+ */
 use std::{collections::VecDeque, error::Error, fmt::Display, path::PathBuf};
 
 use super::{
@@ -22,21 +23,19 @@ use super::{
     tokenizer_trait::Tokenizer,
     trie_char::TrieChar as Trie,
 };
-use crate::four_bytes_str::custom_string::{CustomStringBytesSlice, FixedCharsLengthByteSlice};
+use crate::char_string::{rfind_space_char_index, CharString};
 
-use crate::four_bytes_str::custom_regex::regex_pattern_to_custom_pattern;
-use crate::four_bytes_str::custom_string::{rfind_space_char_index, CustomString, BYTES_PER_CHAR};
 use anyhow::Result as AnyResult;
 use binary_heap_plus::{BinaryHeap, MinComparator};
 use lazy_static::lazy_static;
 use rayon::prelude::*;
-use regex::bytes::Regex;
+use regex::Regex;
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 
 const MAX_GRAPH_SIZE: usize = 50;
 const USE_MULTITHREAD_THRESHOLD: usize = 10000;
 
-// window size to check break points, for safe mode
+// Window size to check break points for safe mode.
 const TEXT_SCAN_POINT: usize = 120;
 const TEXT_SCAN_LEFT: usize = 20;
 const TEXT_SCAN_RIGHT: usize = 20;
@@ -45,26 +44,20 @@ const TEXT_SCAN_END: usize = TEXT_SCAN_POINT + TEXT_SCAN_RIGHT;
 
 type CharacterIndex = usize;
 
+/// Native Unicode patterns for non-Thai text segments.
 const NON_THAI_READABLE_PATTERN: &[&str; 5] = &[
-    r"(?x)^[-a-zA-Z]+",
-    r"(?x)^[0-9]+([,\.][0-9]+)*",
-    r"(?x)^[๐-๙]+([,\.][๐-๙]+)*",
-    r"(?x)^[\ \t]+",
-    r"(?x)^\r?\n",
+    r"^[-a-zA-Z]+",
+    r"^[0-9]+([,\.][0-9]+)*",
+    r"^[๐-๙]+([,\.][๐-๙]+)*",
+    r"^[ \t]+",
+    r"^\r?\n",
 ];
 
 lazy_static! {
-    static ref NON_THAI_PATTERN: Regex = Regex::new(
-        &NON_THAI_READABLE_PATTERN
-            .map(|p| { regex_pattern_to_custom_pattern(p).unwrap() })
-            .join("|")
-    )
-    .unwrap();
-}
-
-lazy_static! {
+    static ref NON_THAI_PATTERN: Regex =
+        Regex::new(&NON_THAI_READABLE_PATTERN.join("|")).unwrap();
     static ref THAI_TWOCHARS_PATTERN: Regex =
-        Regex::new(&regex_pattern_to_custom_pattern(r"^[ก-ฮ]{0,2}$").unwrap()).unwrap();
+        Regex::new(r"^[ก-ฮ]{0,2}$").unwrap();
 }
 
 #[derive(Clone, Debug)]
@@ -106,7 +99,7 @@ pub struct NewmmTokenizer {
 }
 
 impl NewmmTokenizer {
-    /// Create a new tokenizer using a dictionary from a text file
+    /// Create a new tokenizer using a dictionary from a text file.
     pub fn new(dict_path: &str) -> Self {
         NewmmTokenizer {
             dict: Box::from(
@@ -115,24 +108,24 @@ impl NewmmTokenizer {
         }
     }
 
-    /// Create a new tokenizer using a dictionary from a vector of Strings
+    /// Create a new tokenizer using a dictionary from a vector of strings.
     pub fn from_word_list(word_list: Vec<String>) -> Self {
         NewmmTokenizer {
             dict: Box::from(create_dict_trie(DictSource::WordList(word_list)).unwrap()),
         }
     }
 
-    /// Add words to the tokenizer's dictionary
+    /// Add words to the tokenizer's dictionary.
     pub fn add_word(&mut self, word_list: &[&str]) {
         for word in word_list {
-            self.dict.add(&CustomString::new(word));
+            self.dict.add(&CharString::new(word));
         }
     }
 
-    /// Remove words from the tokenizer's dictionary
+    /// Remove words from the tokenizer's dictionary.
     pub fn remove_word(&mut self, word_list: &[&str]) {
         for word in word_list {
-            self.dict.remove(&CustomString::new(word));
+            self.dict.remove(&CharString::new(word));
         }
     }
 
@@ -158,7 +151,6 @@ impl NewmmTokenizer {
                     } else {
                         let mut appended_path = path;
                         appended_path.push(*position);
-
                         return Ok(appended_path);
                     };
                 }
@@ -169,19 +161,19 @@ impl NewmmTokenizer {
     }
 
     fn one_cut<'a>(
-        input: &'a CustomString,
+        input: &'a CharString,
         custom_dict: &Trie,
-    ) -> AnyResult<Vec<&'a CustomStringBytesSlice>> {
+    ) -> AnyResult<Vec<&'a str>> {
         let text = input;
         let input_char_len = text.chars_len();
         let mut reused_queue: VecDeque<(usize, Vec<usize>)> = VecDeque::with_capacity(10);
         let mut graph_size: usize = 0;
         let mut graph: HashMap<CharacterIndex, Vec<CharacterIndex>> = HashMap::default();
         graph.reserve(input_char_len / 10);
-        let mut result_str: Vec<&CustomStringBytesSlice> = Vec::with_capacity(input_char_len / 10);
+        let mut result_str: Vec<&str> = Vec::with_capacity(input_char_len / 10);
 
-        // all position should be refered as character index
-        let valid_position = tcc_tokenizer::tcc_pos(text.raw_content());
+        // All positions are character indices (not byte offsets).
+        let valid_position = tcc_tokenizer::tcc_pos(text.as_str());
         let text_length = input_char_len;
         let mut position_list: BinaryHeap<CharacterIndex, MinComparator> = BinaryHeap::new_min();
         let mut existing_candidate: HashSet<CharacterIndex> = HashSet::default();
@@ -189,8 +181,7 @@ impl NewmmTokenizer {
         position_list.push(0);
         existing_candidate.insert(0);
         let mut end_position: CharacterIndex = 0;
-        // as long as there is a value in the position_list priority queue
-        // AND its value is less than text_length
+
         while match position_list.peek() {
             Some(position) if *position < text_length => true,
             None => false,
@@ -199,8 +190,7 @@ impl NewmmTokenizer {
             if let Some(begin_position) = position_list.pop() {
                 let sub_text_prefix = text.substring(begin_position, text.chars_len());
                 let prefixes = Trie::prefix_ref(&sub_text_prefix, custom_dict);
-                for word in prefixes {
-                    let word_length = word.chars_len();
+                for word_length in prefixes {
                     let end_position_candidate = begin_position + word_length;
                     if valid_position.contains(&end_position_candidate) {
                         let target_graph = graph.get_mut(&begin_position);
@@ -225,7 +215,7 @@ impl NewmmTokenizer {
                 }
                 let position_list_length = position_list.len();
                 if position_list_length == 1 {
-                    //only one candidate!
+                    // Only one candidate left.
                     if let Some(first_position_list) = position_list.peek() {
                         let group_of_end_position_candidate = Self::bfs_paths_graph(
                             &graph,
@@ -233,49 +223,46 @@ impl NewmmTokenizer {
                             *first_position_list,
                             &mut reused_queue,
                         )?;
-                        graph_size = 0; // reset our graph
+                        graph_size = 0; // reset graph
 
                         for position in group_of_end_position_candidate.iter().skip(1) {
-                            let token_bytes = text.substring_as_bytes(end_position, *position);
-
-                            result_str.push(token_bytes);
+                            let token = text.substring_as_str(end_position, *position);
+                            result_str.push(token);
                             end_position = *position;
                         }
                     } else {
                         panic!("Incorrect position list");
                     }
                 } else if position_list_length == 0 {
-                    // no candidate, deal with non-dict word
-                    match NON_THAI_PATTERN.find(sub_text_prefix.raw_content()) {
-                        // is non-Thai -> skip to the end of match
+                    // No candidate: handle non-dictionary segment.
+                    let sub_str = sub_text_prefix.as_str();
+                    match NON_THAI_PATTERN.find(sub_str) {
+                        // Non-Thai text: skip to end of match.
                         Some(match_point) => {
-                            let matched_start_char_index = match_point.start() / BYTES_PER_CHAR;
-                            let matched_end_char_index = match_point.end() / BYTES_PER_CHAR;
-                            end_position = begin_position
-                                + sub_text_prefix
-                                    .raw_content()
-                                    .slice_by_char_indice(
-                                        matched_start_char_index,
-                                        matched_end_char_index,
-                                    )
-                                    .chars_len();
+                            let matched_char_count =
+                                sub_str[..match_point.end()].chars().count();
+                            end_position = begin_position + matched_char_count;
                         }
-                        // is Thai -> find min skip
+                        // Thai text with no dictionary match: find minimum skip.
                         None => {
                             let mut finish_without_break = true;
                             for position in begin_position + 1..text_length {
                                 if valid_position.contains(&position) {
                                     let prefix = text.substring(position, text_length);
 
-                                    let list_of_prefixes = Trie::prefix_ref(&prefix, custom_dict);
-                                    let valid_word_filter = |word: &&[u8]| {
-                                        let new_position = position + word.chars_len();
-                                        let is_valid = valid_position.contains(&new_position);
+                                    let list_of_prefixes =
+                                        Trie::prefix_ref(&prefix, custom_dict);
+                                    let valid_word_filter = |word_length: &usize| {
+                                        let new_position = position + word_length;
+                                        let is_valid =
+                                            valid_position.contains(&new_position);
+                                        let word_str = text
+                                            .substring_as_str(position, position + word_length);
                                         let is_two_thai_chars =
-                                            THAI_TWOCHARS_PATTERN.is_match(word);
+                                            THAI_TWOCHARS_PATTERN.is_match(word_str);
                                         is_valid && !is_two_thai_chars
                                     };
-                                    let valid_words: Vec<&[u8]> =
+                                    let valid_words: Vec<usize> =
                                         if list_of_prefixes.len() >= USE_MULTITHREAD_THRESHOLD {
                                             list_of_prefixes
                                                 .into_par_iter()
@@ -293,7 +280,7 @@ impl NewmmTokenizer {
                                         finish_without_break = false;
                                         break;
                                     };
-                                    if NON_THAI_PATTERN.is_match(prefix.raw_content()) {
+                                    if NON_THAI_PATTERN.is_match(prefix.as_str()) {
                                         end_position = position;
                                         finish_without_break = false;
                                         break;
@@ -309,9 +296,8 @@ impl NewmmTokenizer {
                     if let Some(existing_path) = graph.get_mut(&begin_position) {
                         existing_path.push(end_position);
                         graph_size += 1;
-                        let token_bytes = text.substring_as_bytes(begin_position, end_position);
-
-                        result_str.push(token_bytes);
+                        let token = text.substring_as_str(begin_position, end_position);
+                        result_str.push(token);
                         position_list.push(end_position);
                         existing_candidate.insert(end_position);
                     } else {
@@ -319,8 +305,8 @@ impl NewmmTokenizer {
                         graph_elem.push(end_position);
                         graph.insert(begin_position, graph_elem);
                         graph_size += 1;
-                        let token_bytes = text.substring_as_bytes(begin_position, end_position);
-                        result_str.push(token_bytes);
+                        let token = text.substring_as_str(begin_position, end_position);
+                        result_str.push(token);
                         position_list.push(end_position);
                         existing_candidate.insert(end_position);
                     }
@@ -331,7 +317,7 @@ impl NewmmTokenizer {
     }
 
     fn internal_segment(
-        input: &CustomString,
+        input: &CharString,
         custom_dict: &Trie,
         safe: bool,
         parallel: bool,
@@ -344,28 +330,19 @@ impl NewmmTokenizer {
             Ok(if parallel {
                 result
                     .into_par_iter()
-                    .map(|custom_substring| {
-                        CustomString::convert_raw_bytes_to_std_string(custom_substring)
-                    })
+                    .map(|s| s.to_string())
                     .collect()
             } else {
-                result
-                    .into_iter()
-                    .map(|custom_substring| {
-                        CustomString::convert_raw_bytes_to_std_string(custom_substring)
-                    })
-                    .collect()
+                result.into_iter().map(|s| s.to_string()).collect()
             })
         } else {
             let mut txt = input.substring(0, input.chars_len());
-            let mut txt_parts: Vec<CustomString> = Vec::with_capacity(txt.chars_len() / 10);
+            let mut txt_parts: Vec<CharString> = Vec::with_capacity(txt.chars_len() / 10);
             while txt.chars_len() >= TEXT_SCAN_END {
                 let sample = txt.substring(TEXT_SCAN_BEGIN, TEXT_SCAN_END);
-
                 let mut cut_pos;
 
-                let space_char_index = rfind_space_char_index(sample.raw_content());
-                // there is a space
+                let space_char_index = rfind_space_char_index(sample.as_str());
                 if let Some(space_char_index) = space_char_index {
                     cut_pos = space_char_index + 1;
                 } else {
@@ -373,15 +350,15 @@ impl NewmmTokenizer {
                     let mut token_max_index = 0;
                     let mut token_max_length = 0;
                     for (idx, token) in word_tokens.iter().enumerate() {
-                        if token.chars_len() >= token_max_length {
-                            token_max_length = token.chars_len();
+                        let tok_chars = token.chars().count();
+                        if tok_chars >= token_max_length {
+                            token_max_length = tok_chars;
                             token_max_index = idx;
                         }
                     }
-                    // choose the position that covers longest token
                     cut_pos = TEXT_SCAN_BEGIN;
-                    for i in 0..token_max_index {
-                        cut_pos = cut_pos + word_tokens.get(i).unwrap().chars_len();
+                    for token in word_tokens.iter().take(token_max_index) {
+                        cut_pos += token.chars().count();
                     }
                 }
                 txt_parts.push(txt.substring(0, cut_pos));
@@ -399,7 +376,7 @@ impl NewmmTokenizer {
                         let words = Self::one_cut(bind_part, custom_dict)?;
                         Ok(words
                             .into_par_iter()
-                            .map(CustomString::convert_raw_bytes_to_std_string)
+                            .map(|s| s.to_string())
                             .collect::<Vec<String>>())
                     })
                     .flatten()
@@ -411,7 +388,7 @@ impl NewmmTokenizer {
                         Ok(
                             Self::one_cut(&part.substring(0, part.chars_len()), custom_dict)?
                                 .iter()
-                                .map(|word| CustomString::convert_raw_bytes_to_std_string(word))
+                                .map(|s| s.to_string())
                                 .collect::<Vec<String>>(),
                         )
                     })
@@ -424,7 +401,7 @@ impl NewmmTokenizer {
 
 impl Tokenizer for NewmmTokenizer {
     fn segment(&self, text: &str, safe: bool, parallel: bool) -> AnyResult<Vec<String>> {
-        Self::internal_segment(&CustomString::new(text), &self.dict, safe, parallel)
+        Self::internal_segment(&CharString::new(text), &self.dict, safe, parallel)
     }
 
     fn segment_to_string(&self, text: &str, safe: bool, parallel: bool) -> Vec<String> {
