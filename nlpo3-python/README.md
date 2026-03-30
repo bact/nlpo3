@@ -41,7 +41,7 @@ pip install nlpo3
   - `segment_deepcut()` — CNN-based tokenization using the
     [deepcut][deepcut] model (ONNX, embedded in the binary, no extra
     Python dependencies)
-  - `DeepCutTokenizer` — class-based access to the deepcut model;
+  - `DeepCutTokenizer` — class-based access to the Deepcut model;
     supports custom ONNX model paths and is safe to share across threads
 
 [tcc]: https://dl.acm.org/doi/10.1145/355214.355225
@@ -86,7 +86,7 @@ segment("สวัสดีครับ", dict_name="dict_name", safe=True)
 
 ### Deepcut tokenizer
 
-Tokenize text using the bundled CNN-based deepcut model.
+Tokenize text using the bundled CNN-based Deepcut model.
 No dictionary or additional Python dependencies are required.
 
 ```python
@@ -117,7 +117,7 @@ tokenizer = DeepCutTokenizer(model_path="/path/to/custom.onnx")
 tokenizer.segment("สวัสดีครับ")
 ```
 
-The deepcut model and its ONNX port originate from
+The Deepcut model and its ONNX port originate from
 [Deepcut](https://github.com/rkcosmos/deepcut) and
 [LEKCut](https://github.com/PyThaiNLP/LEKCut).
 
