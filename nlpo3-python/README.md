@@ -31,16 +31,16 @@ pip install nlpo3
 
 ## Features
 
-- Thai word tokenizer
+- Dictionary-based word tokenizer
   - `segment()` — maximal-matching dictionary-based tokenization
     that honors [Thai Character Cluster][tcc] boundaries
     - [2.5x faster][benchmark]
       than similar pure Python implementation (PyThaiNLP's newmm)
   - `load_dict()` — load a dictionary from a plain text file
     (one word per line)
+- ML-based word tokenizer
   - `segment_deepcut()` — CNN-based tokenization using the
-    [deepcut][deepcut] model (ONNX, embedded in the binary, no extra
-    Python dependencies)
+    [deepcut][deepcut] model
   - `DeepCutTokenizer` — class-based access to the Deepcut model;
     supports custom ONNX model paths and is safe to share across threads
 
@@ -86,8 +86,7 @@ segment("สวัสดีครับ", dict_name="dict_name", safe=True)
 
 ### Deepcut tokenizer
 
-Tokenize text using the bundled CNN-based Deepcut model.
-No dictionary or additional Python dependencies are required.
+Tokenize text using the bundled Deepcut model.
 
 ```python
 from nlpo3 import segment_deepcut
