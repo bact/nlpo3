@@ -80,17 +80,12 @@ def segment(
 def segment_deepcut(
     text: Optional[str],
     model_path: Optional[str] = None,
-    providers: Optional[List[str]] = None,
 ) -> List[str]:
     """Break text into tokens using the deepcut CNN model.
 
     Uses a deep learning model (CNN) originally from the deepcut library,
-    ported to ONNX format via LEKCut.  The model runs via the Rust
-    ONNX engine (tract) with no extra Python dependencies.
-
-    ``providers`` enables custom ONNX Runtime execution providers (e.g.
-    GPU).  When ``providers`` is set, the Python onnxruntime path is used
-    (requires ``pip install nlpo3[deepcut]``).
+    ported to ONNX format via LEKCut.  The model runs via the Rust ONNX
+    engine (tract) with no extra Python dependencies.
 
     For distributed or parallel workloads, prefer :class:`DeepCutTokenizer`
     so that each worker process owns and controls its own model instance.
@@ -100,28 +95,11 @@ def segment_deepcut(
     :param model_path: Path to a custom deepcut ONNX model file.
         Uses the bundled default model if not specified.
     :type model_path: str, optional
-    :param providers: ONNX Runtime execution providers.
-        When set, the Python/onnxruntime path is used.
-        Defaults to ``["CPUExecutionProvider"]``.
-        Pass ``["CUDAExecutionProvider", "CPUExecutionProvider"]``
-        for GPU acceleration (requires ``onnxruntime-gpu``).
-    :type providers: list[str], optional
     :return: List of tokens
     :rtype: List[str]
     """
     if not text or not isinstance(text, str):
         return []
-
-    if providers is not None:
-        # Fall back to onnxruntime for custom execution providers (e.g. GPU).
-        # Lazy import so numpy/onnxruntime are only loaded when needed.
-        from .deepcut import segment_deepcut as _py_segment_deepcut
-
-        kwargs: dict = {}
-        if model_path is not None:
-            kwargs["model_path"] = model_path
-        kwargs["providers"] = providers
-        return _py_segment_deepcut(text, **kwargs)
 
     if model_path is not None:
         # Custom model path: use Rust backend directly.

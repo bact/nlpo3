@@ -42,16 +42,6 @@ classifiers = [
   "Typing :: Typed",
 ]
 
-[project.optional-dependencies]
-# numpy and onnxruntime are only needed for the Python fallback path
-# (custom model_path or custom providers).  The default deepcut
-# tokenizer runs via the bundled Rust tract-onnx backend with no
-# additional Python dependencies.
-deepcut = [
-  "numpy>=1.21",
-  "onnxruntime>=1.10",
-]
-
 [project.urls]
 homepage = "https://github.com/PyThaiNLP/nlpo3/tree/main/nlpo3-python"
 repository = "https://github.com/PyThaiNLP/nlpo3/"
@@ -96,7 +86,10 @@ ignore-patterns = [".*\\.pyi$"]
 # step not run during linting.  Suppress E0401 import-error for this module.
 ignored-modules = ["nlpo3._nlpo3_python_backend"]
 
-[tool.pylint."messages control"]
-# C0415: lazy imports of optional dependencies (e.g. numpy/onnxruntime) are
-# intentional — they avoid loading heavy dependencies at package import time.
-disable = ["import-outside-toplevel"]
+[tool.mypy]
+strict = true
+strict_equality = true
+warn_unreachable = true
+# _nlpo3_python_backend is a compiled Rust extension; types come from the
+# .pyi stub.  Ignore the missing-module error at the package level.
+ignore_missing_imports = true
