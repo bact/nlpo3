@@ -8,8 +8,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import List, Tuple
 
-from ._nlpo3_python_backend import load_dict as _rust_load_dict  # pylint: disable=import-error
-from ._nlpo3_python_backend import segment as _rust_segment  # pylint: disable=import-error
+from ._nlpo3_python_backend import load_dict as _rust_load_dict
+from ._nlpo3_python_backend import segment as _rust_segment
 
 __all__ = ["load_dict", "segment"]
 
