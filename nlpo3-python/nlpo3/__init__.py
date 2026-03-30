@@ -15,10 +15,12 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 
 # Imports from the compiled Rust extension module.
-from ._nlpo3_python_backend import DeepCutTokenizer
-from ._nlpo3_python_backend import load_dict as rust_load_dict
-from ._nlpo3_python_backend import segment as rust_segment
-from ._nlpo3_python_backend import segment_deepcut as rust_segment_deepcut
+# _nlpo3_python_backend is a compiled Rust extension; it requires a build
+# step that is not run during linting.  All symbols are typed via the .pyi stub.
+from ._nlpo3_python_backend import DeepCutTokenizer  # pylint: disable=import-error
+from ._nlpo3_python_backend import load_dict as rust_load_dict  # pylint: disable=import-error
+from ._nlpo3_python_backend import segment as rust_segment  # pylint: disable=import-error
+from ._nlpo3_python_backend import segment_deepcut as rust_segment_deepcut  # pylint: disable=import-error
 
 __all__ = ["DeepCutTokenizer", "load_dict", "segment", "segment_deepcut"]
 
@@ -93,7 +95,7 @@ def segment_deepcut(
     For distributed or parallel workloads, prefer :class:`DeepCutTokenizer`
     so that each worker process owns and controls its own model instance.
 
-    :param text: Input text.  Returns an empty list for ``None`` or empty input.
+    :param text: Input text. Returns an empty list for ``None`` or empty input.
     :type text: str, optional
     :param model_path: Path to a custom deepcut ONNX model file.
         Uses the bundled default model if not specified.
