@@ -5,7 +5,7 @@
 
 from typing import List, Optional, Tuple
 
-class DeepCutTokenizer:
+class DeepcutTokenizer:
     """Deepcut CNN-based Thai word tokenizer (Rust backend).
 
     Each instance compiles and owns the ONNX model.  Cloning is cheap
@@ -17,17 +17,17 @@ class DeepCutTokenizer:
 
     Example::
 
-        from nlpo3 import DeepCutTokenizer
+        from nlpo3 import DeepcutTokenizer
 
         # Bundled model
-        tokenizer = DeepCutTokenizer()
+        tokenizer = DeepcutTokenizer()
         tokens = tokenizer.segment("ทดสอบการตัดคำ")
 
         # Custom model from disk
-        tokenizer = DeepCutTokenizer(model_path="/path/to/custom.onnx")
+        tokenizer = DeepcutTokenizer(model_path="/path/to/custom.onnx")
     """
 
-    def __new__(cls, model_path: Optional[str] = None) -> "DeepCutTokenizer": ...
+    def __new__(cls, model_path: Optional[str] = None) -> "DeepcutTokenizer": ...
     def segment(self, text: str) -> List[str]:
         """Break text into tokens using the deepcut CNN model.
 
@@ -86,7 +86,7 @@ def segment_deepcut(text: str) -> List[str]:
     Uses a process-level lazy singleton for the bundled model.  The
     singleton is initialised once on first call; a model-load failure
     raises RuntimeError instead of panicking.  For distributed or
-    parallel workloads, use DeepCutTokenizer directly.
+    parallel workloads, use DeepcutTokenizer directly.
 
     Args:
         text: Input text to segment

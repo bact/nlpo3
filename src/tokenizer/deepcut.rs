@@ -43,7 +43,7 @@ const CHAR_TYPE_INDEX_OTHER: u32 = 4;
 /// Probability threshold for classifying a position as a word boundary.
 const WORD_BOUNDARY_THRESHOLD: f32 = 0.5;
 
-type DeepCutModel =
+type DeepcutModel =
     RunnableModel<TypedFact, Box<dyn TypedOp>, Graph<TypedFact, Box<dyn TypedOp>>>;
 
 // ---------------------------------------------------------------------------
@@ -319,7 +319,7 @@ lazy_static! {
 /// The two ONNX model inputs carry different symbolic batch dimensions.
 /// We unify them with the same `TDim` so that the internal concatenation
 /// constraint in the model is satisfied.
-fn load_model_from_bytes(bytes: &[u8]) -> AnyResult<DeepCutModel> {
+fn load_model_from_bytes(bytes: &[u8]) -> AnyResult<DeepcutModel> {
     let inf_model = tract_onnx::onnx()
         .model_for_read(&mut Cursor::new(bytes))
         .map_err(|e| anyhow::anyhow!("deepcut: failed to read ONNX model: {}", e))?;
@@ -353,7 +353,7 @@ fn load_model_from_bytes(bytes: &[u8]) -> AnyResult<DeepCutModel> {
 }
 
 /// Load and compile the bundled deepcut ONNX model.
-fn load_model() -> AnyResult<DeepCutModel> {
+fn load_model() -> AnyResult<DeepcutModel> {
     load_model_from_bytes(MODEL_BYTES)
 }
 
@@ -408,46 +408,46 @@ fn build_features(text_chars: &[char]) -> (Vec<f32>, Vec<f32>) {
 /// the compiled model is reference-counted with [`Arc`].  Both `Send` and
 /// `Sync` are satisfied, so the same instance may be shared across threads.
 ///
-/// For distributed or parallel workloads, create one `DeepCutTokenizer` per
+/// For distributed or parallel workloads, create one `DeepcutTokenizer` per
 /// worker process; do not rely on any process-level singleton.
 ///
 /// # Example
 ///
 /// ```rust
-/// use nlpo3::tokenizer::deepcut::DeepCutTokenizer;
+/// use nlpo3::tokenizer::deepcut::DeepcutTokenizer;
 /// use nlpo3::tokenizer::tokenizer_trait::Tokenizer;
 ///
-/// let tokenizer = DeepCutTokenizer::new().unwrap();
+/// let tokenizer = DeepcutTokenizer::new().unwrap();
 /// let tokens = tokenizer.segment_to_string("ทดสอบการตัดคำ", false, false);
 /// assert!(!tokens.is_empty());
 /// assert_eq!(tokens.join(""), "ทดสอบการตัดคำ");
 /// ```
 #[derive(Clone)]
-pub struct DeepCutTokenizer {
+pub struct DeepcutTokenizer {
     /// Reference-counted compiled model.  Cloning the tokenizer is O(1).
-    model: Arc<DeepCutModel>,
+    model: Arc<DeepcutModel>,
 }
 
-impl DeepCutTokenizer {
-    /// Create a `DeepCutTokenizer` using the bundled ONNX model.
+impl DeepcutTokenizer {
+    /// Create a `DeepcutTokenizer` using the bundled ONNX model.
     ///
     /// Compiles the model on each call.  For repeated use within the same
     /// process, prefer to create a single instance and reuse it (or clone
     /// it cheaply with [`Clone`]).
     pub fn new() -> AnyResult<Self> {
-        Ok(DeepCutTokenizer {
+        Ok(DeepcutTokenizer {
             model: Arc::new(load_model()?),
         })
     }
 
-    /// Create a `DeepCutTokenizer` from a custom ONNX model file on disk.
+    /// Create a `DeepcutTokenizer` from a custom ONNX model file on disk.
     ///
     /// The model must be compatible with the deepcut input/output schema
     /// (two `float32` inputs of shape `[n, 21]`).
     pub fn from_path(model_path: &std::path::Path) -> AnyResult<Self> {
         let bytes = std::fs::read(model_path)
             .map_err(|e| anyhow::anyhow!("deepcut: failed to read model file {:?}: {}", model_path, e))?;
-        Ok(DeepCutTokenizer {
+        Ok(DeepcutTokenizer {
             model: Arc::new(load_model_from_bytes(&bytes)?),
         })
     }
@@ -512,13 +512,13 @@ impl DeepCutTokenizer {
     }
 }
 
-impl Default for DeepCutTokenizer {
+impl Default for DeepcutTokenizer {
     fn default() -> Self {
-        DeepCutTokenizer::new().expect("deepcut: ONNX model initialization failed")
+        DeepcutTokenizer::new().expect("deepcut: ONNX model initialization failed")
     }
 }
 
-impl Tokenizer for DeepCutTokenizer {
+impl Tokenizer for DeepcutTokenizer {
     /// Tokenize `text` using the deepcut ONNX model.
     ///
     /// The `safe` and `parallel` flags are accepted for API compatibility
@@ -540,8 +540,8 @@ impl Tokenizer for DeepCutTokenizer {
 mod tests {
     use super::*;
 
-    fn tok() -> DeepCutTokenizer {
-        DeepCutTokenizer::new().expect("model should load")
+    fn tok() -> DeepcutTokenizer {
+        DeepcutTokenizer::new().expect("model should load")
     }
 
     #[test]
@@ -566,7 +566,7 @@ mod tests {
 
     #[test]
     fn test_tokenizer_trait() {
-        let tok = DeepCutTokenizer::new().expect("model should load");
+        let tok = DeepcutTokenizer::new().expect("model should load");
         let tokens = tok.segment_to_string("ทดสอบ", false, false);
         assert!(!tokens.is_empty());
         assert_eq!(tokens.join(""), "ทดสอบ");

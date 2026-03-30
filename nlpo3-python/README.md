@@ -41,7 +41,7 @@ pip install nlpo3
 - ML-based word tokenizer
   - `segment_deepcut()` — CNN-based tokenization using the
     [deepcut][deepcut] model
-  - `DeepCutTokenizer` — class-based access to the Deepcut model;
+  - `DeepcutTokenizer` — class-based access to the Deepcut model;
     supports custom ONNX model paths and is safe to share across threads
 
 [tcc]: https://dl.acm.org/doi/10.1145/355214.355225
@@ -100,19 +100,19 @@ The function returns a list of strings, for example:
 ['สวัสดี', 'ครับ']
 ```
 
-Use the `DeepCutTokenizer` class to load a custom ONNX model or to reuse
+Use the `DeepcutTokenizer` class to load a custom ONNX model or to reuse
 a single model instance across multiple calls (the same instance is safe
 to call from multiple threads):
 
 ```python
-from nlpo3 import DeepCutTokenizer
+from nlpo3 import DeepcutTokenizer
 
 # Use the bundled default model
-tokenizer = DeepCutTokenizer()
+tokenizer = DeepcutTokenizer()
 tokenizer.segment("สวัสดีครับ")
 
 # Use a custom model file
-tokenizer = DeepCutTokenizer(model_path="/path/to/custom.onnx")
+tokenizer = DeepcutTokenizer(model_path="/path/to/custom.onnx")
 tokenizer.segment("สวัสดีครับ")
 ```
 

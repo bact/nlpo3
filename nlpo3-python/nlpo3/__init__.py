@@ -9,9 +9,9 @@
 
 from __future__ import annotations
 
-from ._deepcut import DeepCutTokenizer, segment_deepcut
+from ._deepcut import DeepcutTokenizer, segment_deepcut
 from ._newmm import load_dict, segment
 
-__all__ = ["DeepCutTokenizer", "load_dict", "segment", "segment_deepcut"]
+__all__ = ["DeepcutTokenizer", "load_dict", "segment", "segment_deepcut"]
 
 # TODO: load_dict from in-memory list of words

@@ -203,7 +203,7 @@ class TestTokenizePackage(unittest.TestCase):
         self.assertIsInstance(segment(self.DANGER_TEXT_3, DICT_NAME), List)
 
 
-class TestDeepCutSegment(unittest.TestCase):
+class TestDeepcutSegment(unittest.TestCase):
     def test_segment_deepcut_empty(self):
         from nlpo3 import segment_deepcut
 

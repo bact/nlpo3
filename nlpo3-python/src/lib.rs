@@ -15,7 +15,7 @@ use std::sync::{Mutex, OnceLock};
 
 use ahash::AHashMap as HashMap;
 use lazy_static::lazy_static;
-use nlpo3::tokenizer::deepcut::DeepCutTokenizer;
+use nlpo3::tokenizer::deepcut::DeepcutTokenizer;
 use nlpo3::tokenizer::newmm::NewmmTokenizer;
 use nlpo3::tokenizer::tokenizer_trait::Tokenizer;
 use pyo3::prelude::*;
@@ -30,11 +30,11 @@ lazy_static! {
 /// Process-level lazy singleton used by the `segment_deepcut()` convenience
 /// function.  Stored as `Result` so that a model-load failure yields a Python
 /// `RuntimeError` rather than a panic.
-static DEEPCUT_SINGLETON: OnceLock<Result<DeepCutTokenizer, String>> = OnceLock::new();
+static DEEPCUT_SINGLETON: OnceLock<Result<DeepcutTokenizer, String>> = OnceLock::new();
 
-fn get_deepcut_singleton() -> PyResult<&'static DeepCutTokenizer> {
+fn get_deepcut_singleton() -> PyResult<&'static DeepcutTokenizer> {
     DEEPCUT_SINGLETON
-        .get_or_init(|| DeepCutTokenizer::new().map_err(|e| e.to_string()))
+        .get_or_init(|| DeepcutTokenizer::new().map_err(|e| e.to_string()))
         .as_ref()
         .map_err(|e| {
             exceptions::PyRuntimeError::new_err(format!("deepcut: model load failed: {}", e))
@@ -149,26 +149,26 @@ fn remove_word(dict_name: &str, words: Vec<&str>) -> PyResult<(String, bool)> {
 /// (the compiled model is reference-counted).  The same instance is safe to
 /// call from multiple threads simultaneously.
 ///
-/// For distributed or parallel workloads, create one `DeepCutTokenizer` per
+/// For distributed or parallel workloads, create one `DeepcutTokenizer` per
 /// worker process to avoid sharing state across process boundaries.
 ///
 /// ```python
-/// from nlpo3 import DeepCutTokenizer
+/// from nlpo3 import DeepcutTokenizer
 ///
-/// tokenizer = DeepCutTokenizer()
+/// tokenizer = DeepcutTokenizer()
 /// tokens = tokenizer.segment("ทดสอบการตัดคำ")
 ///
 /// # Load a custom ONNX model from disk
-/// tokenizer = DeepCutTokenizer(model_path="/path/to/custom.onnx")
+/// tokenizer = DeepcutTokenizer(model_path="/path/to/custom.onnx")
 /// ```
-#[pyclass(name = "DeepCutTokenizer")]
-struct PyDeepCutTokenizer {
-    inner: DeepCutTokenizer,
+#[pyclass(name = "DeepcutTokenizer")]
+struct PyDeepcutTokenizer {
+    inner: DeepcutTokenizer,
 }
 
 #[pymethods]
-impl PyDeepCutTokenizer {
-    /// Create a new DeepCutTokenizer.
+impl PyDeepcutTokenizer {
+    /// Create a new DeepcutTokenizer.
     ///
     /// If ``model_path`` is ``None`` (the default), the bundled ONNX model is
     /// used.  Pass a filesystem path to load a custom compatible model.
@@ -176,11 +176,11 @@ impl PyDeepCutTokenizer {
     #[pyo3(signature = (model_path=None))]
     fn new(model_path: Option<&str>) -> PyResult<Self> {
         let result = match model_path {
-            None => DeepCutTokenizer::new(),
-            Some(p) => DeepCutTokenizer::from_path(Path::new(p)),
+            None => DeepcutTokenizer::new(),
+            Some(p) => DeepcutTokenizer::from_path(Path::new(p)),
         };
         result
-            .map(|inner| PyDeepCutTokenizer { inner })
+            .map(|inner| PyDeepcutTokenizer { inner })
             .map_err(|e| {
                 exceptions::PyRuntimeError::new_err(format!(
                     "deepcut: failed to create tokenizer: {}",
@@ -213,7 +213,7 @@ impl PyDeepCutTokenizer {
 /// A model-load failure returns a `RuntimeError` instead of panicking.
 ///
 /// For distributed or parallel workloads where each worker should own its
-/// model, use `DeepCutTokenizer` directly instead.
+/// model, use `DeepcutTokenizer` directly instead.
 ///
 /// signature: (text: str) -> List[str]
 #[pyfunction]
@@ -234,6 +234,6 @@ fn _nlpo3_python_backend(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(load_dict, m)?)?;
     m.add_function(wrap_pyfunction!(segment, m)?)?;
     m.add_function(wrap_pyfunction!(segment_deepcut, m)?)?;
-    m.add_class::<PyDeepCutTokenizer>()?;
+    m.add_class::<PyDeepcutTokenizer>()?;
     Ok(())
 }

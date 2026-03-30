@@ -7,10 +7,10 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from ._nlpo3_python_backend import DeepCutTokenizer
+from ._nlpo3_python_backend import DeepcutTokenizer
 from ._nlpo3_python_backend import segment_deepcut as _rust_segment_deepcut
 
-__all__ = ["DeepCutTokenizer", "segment_deepcut"]
+__all__ = ["DeepcutTokenizer", "segment_deepcut"]
 
 
 def segment_deepcut(
@@ -23,7 +23,7 @@ def segment_deepcut(
     ported to ONNX format via LEKCut.  The model runs via the Rust ONNX
     engine (tract) with no extra Python dependencies.
 
-    For distributed or parallel workloads, prefer :class:`DeepCutTokenizer`
+    For distributed or parallel workloads, prefer :class:`DeepcutTokenizer`
     so that each worker process owns and controls its own model instance.
 
     :param text: Input text. Returns an empty list for ``None`` or empty input.
@@ -38,6 +38,6 @@ def segment_deepcut(
         return []
 
     if model_path is not None:
-        return DeepCutTokenizer(model_path=model_path).segment(text)
+        return DeepcutTokenizer(model_path=model_path).segment(text)
 
     return _rust_segment_deepcut(text)
