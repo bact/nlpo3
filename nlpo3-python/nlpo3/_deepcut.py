@@ -7,8 +7,8 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from ._nlpo3_python_backend import DeepCutTokenizer  # pylint: disable=import-error
-from ._nlpo3_python_backend import segment_deepcut as _rust_segment_deepcut  # pylint: disable=import-error
+from ._nlpo3_python_backend import DeepCutTokenizer
+from ._nlpo3_python_backend import segment_deepcut as _rust_segment_deepcut
 
 __all__ = ["DeepCutTokenizer", "segment_deepcut"]
 
