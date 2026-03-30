@@ -62,9 +62,6 @@ exclude = '''
 [tool.setuptools]
 include-package-data = true
 
-[tool.setuptools.package-data]
-"nlpo3" = ["model/*.onnx"]
-
 [tool.setuptools.packages.find]
 include = ["nlpo3"]
 exclude = ["notebooks", "tests"]
