@@ -22,6 +22,9 @@ exclude = [
     "words_th.txt",
 ]
 
+[features]
+deepcut = ["dep:tract-onnx", "dep:ndarray"]
+
 [profile.release]
 lto = true
 codegen-units = 1
@@ -42,6 +45,8 @@ rayon = "1.11"
 regex = "1.12"
 rustc-hash = "1.1"
 regex-syntax = "0.6"
+ndarray = { version = "0.16", optional = true }
+tract-onnx = { version = "0.21", optional = true }
 
 [[test]]
 name = "basic"

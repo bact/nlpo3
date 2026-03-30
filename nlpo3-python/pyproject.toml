@@ -39,7 +39,6 @@ classifiers = [
   "Natural Language :: Thai",
   "Topic :: Text Processing :: Linguistic",
   "Topic :: Software Development :: Libraries :: Python Modules",
-  "Typing :: Typed",
 ]
 
 [project.urls]
@@ -58,6 +57,32 @@ exclude = '''
   | dist
 )/
 '''
+
+[tool.mypy]
+pretty = true
+show_column_numbers = true
+show_error_code_links = true
+show_error_context = true
+strict = true
+strict_equality = true
+strict_equality_for_none = true
+warn_unreachable = true
+# _nlpo3_python_backend is a compiled Rust extension; types come from the
+# .pyi stub.  Ignore the missing-module error at the package level.
+ignore_missing_imports = true
+
+[tool.pylint.main]
+# Exclude type-stub files: pylint does not fully understand .pyi semantics
+# (e.g. the mandatory use of ... as function bodies and declared-but-unused
+# stub arguments).
+ignore-patterns = [".*\\.pyi$"]
+
+[tool.pylint.typecheck]
+# _nlpo3_python_backend is a compiled Rust extension that requires a build
+# step not run during linting.  Suppress E0401 import-error for this module.
+# Pylint resolves the relative import `from ._nlpo3_python_backend import ...`
+# under either name depending on context, so both forms are listed.
+ignored-modules = ["nlpo3._nlpo3_python_backend", "_nlpo3_python_backend"]
 
 [tool.setuptools]
 include-package-data = true

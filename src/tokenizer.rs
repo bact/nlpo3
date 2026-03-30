@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: 2024 PyThaiNLP Project
 // SPDX-License-Identifier: Apache-2.0
 
+#[cfg(feature = "deepcut")]
+pub mod deepcut;
 mod dict_reader;
 pub mod newmm;
 pub(crate) mod tcc;

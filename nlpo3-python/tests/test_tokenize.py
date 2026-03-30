@@ -201,3 +201,34 @@ class TestTokenizePackage(unittest.TestCase):
         self.assertIsInstance(segment(self.DANGER_TEXT_1, DICT_NAME), List)
         self.assertIsInstance(segment(self.DANGER_TEXT_2, DICT_NAME), List)
         self.assertIsInstance(segment(self.DANGER_TEXT_3, DICT_NAME), List)
+
+
+class TestDeepcutSegment(unittest.TestCase):
+    def test_segment_deepcut_empty(self):
+        from nlpo3 import segment_deepcut
+
+        self.assertEqual(segment_deepcut(""), [])
+        self.assertEqual(segment_deepcut(None), [])
+
+    def test_segment_deepcut_returns_list(self):
+        from nlpo3 import segment_deepcut
+
+        result = segment_deepcut("ทดสอบ")
+        self.assertIsInstance(result, list)
+        self.assertTrue(len(result) > 0)
+
+    def test_segment_deepcut_basic(self):
+        from nlpo3 import segment_deepcut
+
+        result = segment_deepcut("ทดสอบการตัดคำ")
+        self.assertIsInstance(result, list)
+        self.assertTrue(len(result) > 0)
+        # Reconstructed text must equal the input.
+        self.assertEqual("".join(result), "ทดสอบการตัดคำ")
+
+    def test_segment_deepcut_reconstructs_input(self):
+        from nlpo3 import segment_deepcut
+
+        text = "หมอนทองตากลมหูว์MBK39"
+        result = segment_deepcut(text)
+        self.assertEqual("".join(result), text)

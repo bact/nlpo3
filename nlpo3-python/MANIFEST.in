@@ -1,6 +1,16 @@
 include LICENSE README.md pyproject.toml Cargo.toml
 recursive-include src *
 
+# Include parent Rust crate sources and embedded ONNX model required by the
+# deepcut extension.  The nlpo3 Python binding depends on the nlpo3 Rust
+# crate via a path dependency (../), so both must be present when building
+# from an sdist.  This package is designed for monorepo builds; users
+# building from PyPI source distributions should use a binary wheel instead.
+graft ../src
+include ../Cargo.toml
+include ../Cargo.lock
+graft ../model
+
 # Ensure the Python package files are included in the sdist
 graft nlpo3
 
