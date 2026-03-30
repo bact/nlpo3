@@ -3,7 +3,7 @@
 
 """Type stubs for _nlpo3_python_backend Rust extension module."""
 
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 class DeepCutTokenizer:
     """Deepcut CNN-based Thai word tokenizer (Rust backend).
@@ -19,11 +19,15 @@ class DeepCutTokenizer:
 
         from nlpo3 import DeepCutTokenizer
 
+        # Bundled model
         tokenizer = DeepCutTokenizer()
         tokens = tokenizer.segment("ทดสอบการตัดคำ")
+
+        # Custom model from disk
+        tokenizer = DeepCutTokenizer(model_path="/path/to/custom.onnx")
     """
 
-    def __new__(cls) -> "DeepCutTokenizer": ...
+    def __new__(cls, model_path: Optional[str] = None) -> "DeepCutTokenizer": ...
     def segment(self, text: str) -> List[str]:
         """Break text into tokens using the deepcut CNN model.
 
@@ -79,8 +83,10 @@ def segment(
 def segment_deepcut(text: str) -> List[str]:
     """Break text into tokens using the deepcut CNN model.
 
-    Uses a process-level lazy singleton for the model.  For distributed
-    or parallel workloads, use DeepCutTokenizer directly.
+    Uses a process-level lazy singleton for the bundled model.  The
+    singleton is initialised once on first call; a model-load failure
+    raises RuntimeError instead of panicking.  For distributed or
+    parallel workloads, use DeepCutTokenizer directly.
 
     Args:
         text: Input text to segment
@@ -89,6 +95,6 @@ def segment_deepcut(text: str) -> List[str]:
         List of tokens
 
     Raises:
-        RuntimeError: If ONNX inference fails
+        RuntimeError: If model load or ONNX inference fails
     """
     ...

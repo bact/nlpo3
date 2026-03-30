@@ -587,6 +587,7 @@ dependencies = [
  "binary-heap-plus",
  "bytecount",
  "lazy_static",
+ "ndarray",
  "rayon",
  "regex",
  "regex-syntax 0.6.29",

@@ -214,14 +214,14 @@ class TestDeepCutSegment(unittest.TestCase):
         from nlpo3 import segment_deepcut
 
         result = segment_deepcut("ทดสอบ")
-        self.assertIsInstance(result, List)
+        self.assertIsInstance(result, list)
         self.assertTrue(len(result) > 0)
 
     def test_segment_deepcut_basic(self):
         from nlpo3 import segment_deepcut
 
         result = segment_deepcut("ทดสอบการตัดคำ")
-        self.assertIsInstance(result, List)
+        self.assertIsInstance(result, list)
         self.assertTrue(len(result) > 0)
         # Reconstructed text must equal the input.
         self.assertEqual("".join(result), "ทดสอบการตัดคำ")

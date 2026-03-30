@@ -20,6 +20,7 @@ use std::sync::Arc;
 
 use anyhow::Result as AnyResult;
 use lazy_static::lazy_static;
+use ndarray::Array2;
 use tract_onnx::prelude::*;
 use tract_onnx::tract_hir::infer::Factoid;
 
@@ -310,14 +311,14 @@ lazy_static! {
 // Model loading
 // ---------------------------------------------------------------------------
 
-/// Load and compile the deepcut ONNX model from the embedded bytes.
+/// Load and compile a deepcut ONNX model from raw bytes.
 ///
 /// The two ONNX model inputs carry different symbolic batch dimensions.
-/// We unify them with the same `TDim` (taken from input 0) so that the
-/// internal concatenation constraint in the model is satisfied.
-fn load_model() -> AnyResult<DeepCutModel> {
+/// We unify them with the same `TDim` so that the internal concatenation
+/// constraint in the model is satisfied.
+fn load_model_from_bytes(bytes: &[u8]) -> AnyResult<DeepCutModel> {
     let inf_model = tract_onnx::onnx()
-        .model_for_read(&mut Cursor::new(MODEL_BYTES))
+        .model_for_read(&mut Cursor::new(bytes))
         .map_err(|e| anyhow::anyhow!("deepcut: failed to read ONNX model: {}", e))?;
 
     let dims0: Vec<_> = inf_model
@@ -326,26 +327,31 @@ fn load_model() -> AnyResult<DeepCutModel> {
         .shape
         .dims()
         .collect();
-    let batch_tdim: TDim = dims0[0]
-        .concretize()
-        .ok_or_else(|| anyhow::anyhow!("deepcut: batch dimension has no concrete value"))?;
-    let shared_shape: TVec<TDim> = tvec![batch_tdim, 21usize.into()];
+    // The two inputs carry different symbolic batch dimensions.  Unify them by
+    // assigning the same TDim to both so tract can satisfy the internal shape
+    // constraint.  If the factoid is `Any` (shape fully unknown), use a
+    // dtype-only fact and let tract infer both inputs freely.
+    let shared_fact =
+        if let Some(batch_tdim) = dims0.first().and_then(|d| d.concretize()) {
+            InferenceFact::dt_shape(f32::datum_type(), tvec![batch_tdim, 21usize.into()])
+        } else {
+            InferenceFact::dt(f32::datum_type())
+        };
 
     inf_model
-        .with_input_fact(
-            0,
-            InferenceFact::dt_shape(f32::datum_type(), shared_shape.clone()),
-        )
+        .with_input_fact(0, shared_fact.clone())
         .map_err(|e| anyhow::anyhow!("deepcut: failed to set input fact 0: {}", e))?
-        .with_input_fact(
-            1,
-            InferenceFact::dt_shape(f32::datum_type(), shared_shape),
-        )
+        .with_input_fact(1, shared_fact)
         .map_err(|e| anyhow::anyhow!("deepcut: failed to set input fact 1: {}", e))?
         .into_optimized()
         .map_err(|e| anyhow::anyhow!("deepcut: model optimization failed: {}", e))?
         .into_runnable()
         .map_err(|e| anyhow::anyhow!("deepcut: model compilation failed: {}", e))
+}
+
+/// Load and compile the bundled deepcut ONNX model.
+fn load_model() -> AnyResult<DeepCutModel> {
+    load_model_from_bytes(MODEL_BYTES)
 }
 
 // ---------------------------------------------------------------------------
@@ -420,14 +426,26 @@ pub struct DeepCutTokenizer {
 }
 
 impl DeepCutTokenizer {
-    /// Create a new `DeepCutTokenizer`.
+    /// Create a `DeepCutTokenizer` using the bundled ONNX model.
     ///
-    /// Compiles the bundled ONNX model on first call.  For repeated use
-    /// within the same process, prefer to create a single instance and reuse
-    /// it (or clone it cheaply with [`Clone`]).
+    /// Compiles the model on each call.  For repeated use within the same
+    /// process, prefer to create a single instance and reuse it (or clone
+    /// it cheaply with [`Clone`]).
     pub fn new() -> AnyResult<Self> {
         Ok(DeepCutTokenizer {
             model: Arc::new(load_model()?),
+        })
+    }
+
+    /// Create a `DeepCutTokenizer` from a custom ONNX model file on disk.
+    ///
+    /// The model must be compatible with the deepcut input/output schema
+    /// (two `float32` inputs of shape `[n, 21]`).
+    pub fn from_path(model_path: &std::path::Path) -> AnyResult<Self> {
+        let bytes = std::fs::read(model_path)
+            .map_err(|e| anyhow::anyhow!("deepcut: failed to read model file {:?}: {}", model_path, e))?;
+        Ok(DeepCutTokenizer {
+            model: Arc::new(load_model_from_bytes(&bytes)?),
         })
     }
 
@@ -446,12 +464,10 @@ impl DeepCutTokenizer {
 
         let (x_char_flat, x_type_flat) = build_features(&text_chars);
 
-        let x_char =
-            tract_ndarray::Array2::<f32>::from_shape_vec((n, N_PAD), x_char_flat)
-                .map_err(|e| anyhow::anyhow!("deepcut: failed to build x_char array: {}", e))?;
-        let x_type =
-            tract_ndarray::Array2::<f32>::from_shape_vec((n, N_PAD), x_type_flat)
-                .map_err(|e| anyhow::anyhow!("deepcut: failed to build x_type array: {}", e))?;
+        let x_char = Array2::<f32>::from_shape_vec((n, N_PAD), x_char_flat)
+            .map_err(|e| anyhow::anyhow!("deepcut: failed to build x_char array: {}", e))?;
+        let x_type = Array2::<f32>::from_shape_vec((n, N_PAD), x_type_flat)
+            .map_err(|e| anyhow::anyhow!("deepcut: failed to build x_type array: {}", e))?;
 
         let outputs = self
             .model

@@ -10,7 +10,8 @@
  * Thanathip Suntorntip
  * Arthit Suriyawongkul
  */
-use std::sync::Mutex;
+use std::path::Path;
+use std::sync::{Mutex, OnceLock};
 
 use ahash::AHashMap as HashMap;
 use lazy_static::lazy_static;
@@ -24,12 +25,20 @@ use pyo3::{exceptions, wrap_pyfunction};
 lazy_static! {
     static ref TOKENIZER_COLLECTION: Mutex<HashMap<String, Box<NewmmTokenizer>>> =
         Mutex::new(HashMap::new());
-    /// Process-level singleton for the `segment_deepcut` convenience function.
-    /// Initialised once on first call; read-only thereafter.
-    /// Users who need per-instance control (e.g. distributed workloads) should
-    /// create `DeepCutTokenizer()` instances directly instead.
-    static ref DEEPCUT_SINGLETON: DeepCutTokenizer =
-        DeepCutTokenizer::new().expect("deepcut: ONNX model initialisation failed");
+}
+
+/// Process-level lazy singleton used by the `segment_deepcut()` convenience
+/// function.  Stored as `Result` so that a model-load failure yields a Python
+/// `RuntimeError` rather than a panic.
+static DEEPCUT_SINGLETON: OnceLock<Result<DeepCutTokenizer, String>> = OnceLock::new();
+
+fn get_deepcut_singleton() -> PyResult<&'static DeepCutTokenizer> {
+    DEEPCUT_SINGLETON
+        .get_or_init(|| DeepCutTokenizer::new().map_err(|e| e.to_string()))
+        .as_ref()
+        .map_err(|e| {
+            exceptions::PyRuntimeError::new_err(format!("deepcut: model load failed: {}", e))
+        })
 }
 
 /// Load a dictionary file to a tokenizer,
@@ -141,14 +150,16 @@ fn remove_word(dict_name: &str, words: Vec<&str>) -> PyResult<(String, bool)> {
 /// call from multiple threads simultaneously.
 ///
 /// For distributed or parallel workloads, create one `DeepCutTokenizer` per
-/// worker process to avoid sharing mutable state across process boundaries.
+/// worker process to avoid sharing state across process boundaries.
 ///
 /// ```python
 /// from nlpo3 import DeepCutTokenizer
 ///
 /// tokenizer = DeepCutTokenizer()
 /// tokens = tokenizer.segment("ทดสอบการตัดคำ")
-/// # ['ทดสอบ', 'การ', 'ตัด', 'คำ']
+///
+/// # Load a custom ONNX model from disk
+/// tokenizer = DeepCutTokenizer(model_path="/path/to/custom.onnx")
 /// ```
 #[pyclass(name = "DeepCutTokenizer")]
 struct PyDeepCutTokenizer {
@@ -157,10 +168,18 @@ struct PyDeepCutTokenizer {
 
 #[pymethods]
 impl PyDeepCutTokenizer {
-    /// Create a new DeepCutTokenizer, compiling the bundled ONNX model.
+    /// Create a new DeepCutTokenizer.
+    ///
+    /// If ``model_path`` is ``None`` (the default), the bundled ONNX model is
+    /// used.  Pass a filesystem path to load a custom compatible model.
     #[new]
-    fn new() -> PyResult<Self> {
-        DeepCutTokenizer::new()
+    #[pyo3(signature = (model_path=None))]
+    fn new(model_path: Option<&str>) -> PyResult<Self> {
+        let result = match model_path {
+            None => DeepCutTokenizer::new(),
+            Some(p) => DeepCutTokenizer::from_path(Path::new(p)),
+        };
+        result
             .map(|inner| PyDeepCutTokenizer { inner })
             .map_err(|e| {
                 exceptions::PyRuntimeError::new_err(format!(
@@ -187,8 +206,9 @@ impl PyDeepCutTokenizer {
 
 /// Break text into tokens using the deepcut CNN model (ONNX inference).
 ///
-/// Uses a process-level lazy singleton for the model.  The singleton is
-/// initialised once, is read-only thereafter, and is safe for concurrent use.
+/// Uses a process-level lazy singleton for the bundled model.  The singleton
+/// is initialised once on the first call and is safe for concurrent use.
+/// A model-load failure returns a `RuntimeError` instead of panicking.
 ///
 /// For distributed or parallel workloads where each worker should own its
 /// model, use `DeepCutTokenizer` directly instead.
@@ -200,7 +220,7 @@ fn segment_deepcut(text: &str) -> PyResult<Vec<String>> {
     if text.is_empty() {
         return Ok(vec![]);
     }
-    DEEPCUT_SINGLETON
+    get_deepcut_singleton()?
         .tokenize(text)
         .map_err(|e| {
             exceptions::PyRuntimeError::new_err(format!("deepcut inference failed: {}", e))
