@@ -1,28 +1,22 @@
-// SPDX-FileCopyrightText: 2024 PyThaiNLP Project
+// SPDX-FileCopyrightText: 2024-2026 PyThaiNLP Project
 // SPDX-License-Identifier: Apache-2.0
 
 /**
- * This module is meant to be a direct implementation of Dict Trie in PyThaiNLP.
- * 
- * Many functions are implemented as a recursive function
- * because of the limits imposed by Rust Borrow Checker and
- * this author's (Thanathip) little experience.
- * 
- * Rust Code: Thanathip Suntorntip (Gorlph)
- * 
- * For basic information of trie, visit this wikipedia page
- * https://en.wikipedia.org/wiki/Trie
-*/
-use crate::four_bytes_str::custom_string::{
-    CustomString, CustomStringBytesSlice, CustomStringBytesVec, FixedCharsLengthByteSlice,
-};
-
+ * Character-based trie for dictionary prefix lookup.
+ *
+ * The trie nodes branch on `char` values (Rust's native Unicode scalar),
+ * so the structure works directly on UTF-8 text without any custom encoding.
+ * Words are stored as `String` keys for O(k) membership tests.
+ *
+ * For basic information on tries, see:
+ *   https://en.wikipedia.org/wiki/Trie
+ */
+use crate::char_string::CharString;
+use crate::tokenizer::dict_backend::DictBackend;
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
-use std::borrow::BorrowMut;
 
 #[derive(Debug)]
 struct TrieNode {
-    ///
     children: HashMap<char, Self>,
     end: bool,
 }
@@ -41,69 +35,66 @@ impl TrieNode {
         }
     }
 
-    fn find_child(&self, word: &char) -> Option<&Self> {
-        self.children.get(word)
+    fn find_child(&self, ch: &char) -> Option<&Self> {
+        self.children.get(ch)
     }
 
-    #[allow(dead_code)]
-    fn remove_child(&mut self, word: &char) {
-        self.children.remove(word);
+    fn find_mut_child(&mut self, ch: &char) -> Option<&mut Self> {
+        self.children.get_mut(ch)
     }
 
-    #[allow(dead_code)]
-    fn find_mut_child(&mut self, word: &char) -> Option<&mut Self> {
-        self.children.get_mut(word)
+    fn remove_child(&mut self, ch: &char) {
+        self.children.remove(ch);
     }
 
-    #[allow(dead_code)]
     fn set_not_end(&mut self) {
         self.end = false;
     }
 
-    fn add_word(&mut self, input_word: &CustomString) {
-        // thanks to https://stackoverflow.com/questions/36957286/how-do-you-implement-this-simple-trie-node-in-rust
-        if input_word.is_empty() {
+    fn add_word(&mut self, chars: &[char]) {
+        if chars.is_empty() {
             self.end = true;
             return;
         }
         self.children
-            .entry(*input_word.get_chars_content().first().unwrap())
+            .entry(chars[0])
             .or_insert_with(TrieNode::new)
-            .add_word(&input_word.substring(1, input_word.chars_len()));
+            .add_word(&chars[1..]);
     }
 
-    fn remove_word(&mut self, input_word: &CustomString) {
-        let mut word = input_word;
-        let char_count = word.chars_len();
-        // if has at least 1 char
-        if char_count >= 1 {
-            let character = word.get_chars_content().first().unwrap();
-            if let Some(child) = self.find_mut_child(character) {
-                // move 1 character
-                let substring_of_word = word.substring(1, word.chars_len());
-                if char_count == 1 {
-                    child.set_not_end();
-                }
-                word = &substring_of_word;
-                child.remove_word(word);
-                if !child.end && child.children.is_empty() {
-                    self.remove_child(character);
-                }
-            };
+    fn remove_word(&mut self, chars: &[char]) {
+        if chars.is_empty() {
+            return;
+        }
+        let ch = chars[0];
+        if let Some(child) = self.find_mut_child(&ch) {
+            if chars.len() == 1 {
+                child.set_not_end();
+            } else {
+                child.remove_word(&chars[1..]);
+            }
+            if !child.end && child.children.is_empty() {
+                self.remove_child(&ch);
+            }
         }
     }
 }
 
+/// Character-based trie storing a set of words.
+///
+/// Words are decoded to Unicode scalar values (`char`) on insertion, and the
+/// trie branches on those `char` values.  This allows the trie to work
+/// directly with Rust's standard UTF-8 string types without any intermediate
+/// encoding: each `&str` is decoded once on the way in, and lookups compare
+/// decoded `char` values.
 #[derive(Debug)]
-/// This version of Trie still stores custom bytes vector as words,
-/// but prefix operation and its node uses char instead.
 pub struct TrieChar {
-    words: HashSet<CustomStringBytesVec>,
+    words: HashSet<String>,
     root: TrieNode,
 }
 
 impl TrieChar {
-    pub fn new(words: &[CustomString]) -> Self {
+    pub fn new(words: &[CharString]) -> Self {
         let mut instance = Self {
             words: HashSet::default(),
             root: TrieNode::new(),
@@ -114,85 +105,132 @@ impl TrieChar {
         instance
     }
 
-    #[allow(dead_code)]
-    fn remove_word_from_set(&mut self, word: &CustomString) {
-        self.words.remove(word.raw_content());
-    }
-
-    pub fn add(&mut self, word: &CustomString) {
-        let stripped_word = word.trim();
-        if !stripped_word.is_empty() {
-            self.words.insert(stripped_word.raw_content().into());
-            let current_cursor = self.root.borrow_mut();
-            current_cursor.add_word(&stripped_word);
+    pub fn add(&mut self, word: &CharString) {
+        let stripped = word.trim();
+        if !stripped.is_empty() {
+            let key = stripped.as_str().to_string();
+            let chars: Vec<char> = key.chars().collect();
+            self.words.insert(key);
+            self.root.add_word(&chars);
         }
     }
 
-    pub fn remove(&mut self, word: &CustomString) {
-        let stripped_word = word.trim();
-        if !stripped_word.is_empty() && self.words.contains(stripped_word.raw_content()) {
-            self.remove_word_from_set(&stripped_word);
-            self.root.remove_word(&stripped_word); // remove from node
+    pub fn remove(&mut self, word: &CharString) {
+        let stripped = word.trim();
+        if !stripped.is_empty() {
+            let key = stripped.as_str();
+            if self.words.contains(key) {
+                let chars: Vec<char> = key.chars().collect();
+                self.words.remove(key);
+                self.root.remove_word(&chars);
+            }
         }
     }
+
     #[allow(dead_code)]
-    pub fn contain(&self, word: &CustomString) -> bool {
-        self.words.contains(word.raw_content())
+    pub fn contain(&self, word: &CharString) -> bool {
+        self.words.contains(word.as_str())
     }
+
     #[allow(dead_code)]
-    pub fn iterate(&self) -> std::collections::hash_set::Iter<'_, Vec<u8>> {
+    pub fn iterate(&self) -> std::collections::hash_set::Iter<'_, String> {
         self.words.iter()
     }
+
     #[allow(dead_code)]
     pub fn amount_of_words(&self) -> usize {
         self.words.len()
     }
-    /// Returns a vec of substring (as reference) as produced by words stored in dict_trie.
-    pub fn prefix_ref<'p>(
-        prefix: &'p CustomString,
-        dict_trie: &Self,
-    ) -> Vec<&'p CustomStringBytesSlice> {
-        let mut result: Vec<&[u8]> = vec![];
-        let prefix_cpy = prefix;
-        let mut current_index = 0;
-        let mut current_node_wrap = Some(&dict_trie.root);
-        while current_index < prefix_cpy.chars_len() {
-            let character = prefix_cpy.get_char_at(current_index);
-            if let Some(current_node) = current_node_wrap {
-                if let Some(child) = current_node.find_child(&character) {
-                    if child.end {
-                        let substring_of_prefix = prefix_cpy
-                            .raw_content()
-                            .slice_by_char_indice(0, current_index + 1);
-                        result.push(substring_of_prefix);
+
+    /// Return character lengths of all dictionary entries that are prefixes
+    /// of `prefix`.
+    ///
+    /// For example, if the dictionary contains "กข" and "กขค" and `prefix`
+    /// starts with "กขคงจ", the result is `[2, 3]`.
+    pub fn prefix_ref(prefix: &CharString, dict_trie: &Self) -> Vec<usize> {
+        let mut result: Vec<usize> = Vec::new();
+        let mut current_node = Some(&dict_trie.root);
+        let n = prefix.chars_len();
+
+        for i in 0..n {
+            let ch = prefix.get_char_at(i);
+            match current_node {
+                Some(node) => match node.find_child(&ch) {
+                    Some(child) => {
+                        if child.end {
+                            result.push(i + 1); // word of length i+1 chars
+                        }
+                        current_node = Some(child);
                     }
-                    current_node_wrap = Some(child);
-                } else {
-                    break;
-                }
+                    None => break,
+                },
+                None => break,
             }
-            current_index = current_index + 1;
         }
         result
     }
 }
 
-#[test]
-fn test_add_and_remove_word() {
-    let mut trie = TrieChar::new(&[CustomString::new("ศาล")]);
-    assert_eq!(trie.amount_of_words(), 1);
-    trie.add(&CustomString::new("ศาล"));
-    assert_eq!(trie.amount_of_words(), 1);
-    trie.add(&CustomString::new("  ศาล "));
-    assert_eq!(trie.amount_of_words(), 1);
-    trie.add(&CustomString::new("ศาลา"));
-    assert_eq!(trie.amount_of_words(), 2);
-    trie.remove(&CustomString::new("ศาลา"));
-    assert_eq!(trie.amount_of_words(), 1);
-    trie.remove(&CustomString::new("ลา"));
-    assert_eq!(trie.amount_of_words(), 1);
-    trie.remove(&CustomString::new("ศาล"));
-    assert_eq!(trie.amount_of_words(), 0);
-    trie.remove(&CustomString::new(""));
-    assert_eq!(trie.amount_of_words(), 0);
+// ---------------------------------------------------------------------------
+// DictBackend implementation
+// ---------------------------------------------------------------------------
+
+impl DictBackend for TrieChar {
+    fn prefix_lengths_of(&self, prefix: &CharString) -> Vec<usize> {
+        TrieChar::prefix_ref(prefix, self)
+    }
+
+    fn add_word(&mut self, word: &CharString) {
+        self.add(word);
+    }
+
+    fn remove_word(&mut self, word: &CharString) {
+        self.remove(word);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Unit tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_add_and_remove_word() {
+        let mut trie = TrieChar::new(&[CharString::new("ศาล")]);
+        assert_eq!(trie.amount_of_words(), 1);
+        trie.add(&CharString::new("ศาล"));
+        assert_eq!(trie.amount_of_words(), 1);
+        trie.add(&CharString::new("  ศาล "));
+        assert_eq!(trie.amount_of_words(), 1);
+        trie.add(&CharString::new("ศาลา"));
+        assert_eq!(trie.amount_of_words(), 2);
+        trie.remove(&CharString::new("ศาลา"));
+        assert_eq!(trie.amount_of_words(), 1);
+        trie.remove(&CharString::new("ลา"));
+        assert_eq!(trie.amount_of_words(), 1);
+        trie.remove(&CharString::new("ศาล"));
+        assert_eq!(trie.amount_of_words(), 0);
+        trie.remove(&CharString::new(""));
+        assert_eq!(trie.amount_of_words(), 0);
+    }
+
+    #[test]
+    fn test_prefix_ref() {
+        let words = vec![
+            CharString::new("ก"),
+            CharString::new("กข"),
+            CharString::new("กขค"),
+            CharString::new("คง"),
+        ];
+        let trie = TrieChar::new(&words);
+        let input = CharString::new("กขคงจ");
+        let lengths = TrieChar::prefix_ref(&input, &trie);
+        assert!(lengths.contains(&1));
+        assert!(lengths.contains(&2));
+        assert!(lengths.contains(&3));
+        assert_eq!(lengths.len(), 3);
+    }
 }

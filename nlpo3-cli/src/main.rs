@@ -2,10 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use clap::Clap;
-use nlpo3::tokenizer::newmm_custom::Newmm;
+use nlpo3::tokenizer::newmm::NewmmTokenizer;
 use nlpo3::tokenizer::tokenizer_trait::Tokenizer;
 use std::io;
 use std::io::BufRead;
+
+const DEFAULT_DICT: &str =
+    include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../words_th.txt"));
 
 #[derive(Clap, Debug)]
 #[clap(name = "nlpo3")]
@@ -47,16 +50,21 @@ fn main() {
         dict_name => Some(dict_name),
     };
 
-    let newmm = Newmm::new(dict_path);
+    let newmm: NewmmTokenizer = match dict_path {
+        None => NewmmTokenizer::from_word_list(
+            DEFAULT_DICT.lines().map(|s| s.to_owned()).collect(),
+        ),
+        Some(path) => NewmmTokenizer::new(path),
+    };
     for line_opt in io::stdin().lock().lines() {
         let cleaned_line = match line_opt {
             Ok(line) => line.trim_end_matches('\n').to_string(),
             Err(e) => panic!("Cannot read line {}", e),
         };
-        let toks = newmm.segment(
+        let toks = newmm.segment_to_string(
             &cleaned_line,
-            Some(segment_opts.safe),
-            Some(segment_opts.parallel),
+            segment_opts.safe,
+            segment_opts.parallel,
         );
         println!("{}", toks.join(segment_opts.word_delimiter.as_str()));
     }

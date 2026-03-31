@@ -39,14 +39,20 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 anyhow = "1.0"
 binary-heap-plus = "0.5"
-bytecount = "0.6"
+fst = "0.4.7"
 lazy_static = "1.5"
 rayon = "1.11"
 regex = "1.12"
 rustc-hash = "1.1"
-regex-syntax = "0.6"
 ndarray = { version = "0.16", optional = true }
 tract-onnx = { version = "0.21", optional = true }
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "tokenizer"
+harness = false
 
 [[test]]
 name = "basic"

@@ -18,4 +18,4 @@ path = "src/main.rs"
 
 [dependencies]
 clap = "3.0.0-beta.2"
-nlpo3 = "1.4.0"
+nlpo3 = { version = "1.4", path = ".." }

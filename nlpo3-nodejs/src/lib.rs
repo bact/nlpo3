@@ -50,7 +50,7 @@ fn segment(mut cx: FunctionContext) -> JsResult<JsArray> {
     let parallel = cx.argument::<JsBoolean>(3)?.value(&mut cx);
     if let Some(loaded_tokenizer) = TOKENIZER_COLLECTION.lock().unwrap().get(&dict_name) {
         let result = loaded_tokenizer.segment_to_string(&text, safe, parallel);
-        let js_result_array = JsArray::new(&mut cx, result.len() as u32);
+        let js_result_array = JsArray::new(&mut cx, result.len());
         for (i, obj) in result.iter().enumerate() {
             let js_string = cx.string(obj);
             js_result_array.set(&mut cx, i as u32, js_string).unwrap();

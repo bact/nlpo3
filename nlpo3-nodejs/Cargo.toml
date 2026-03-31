@@ -19,7 +19,7 @@ crate-type = ["cdylib"]
 [dependencies]
 ahash = "0.8.6"
 lazy_static = "1.5.0"
-nlpo3 = "1.4.0"
+nlpo3 = { version = "1.4", path = ".." }
 
 [dependencies.neon]
 version = "1.0.0"
