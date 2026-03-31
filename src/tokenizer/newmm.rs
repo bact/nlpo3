@@ -9,8 +9,7 @@
  * with heuristic graph size limit added to avoid exponential wait time.
  *
  * :See Also:
- *  * \
- *   https://github.com/PyThaiNLP/pythainlp/blob/dev/pythainlp/tokenize/newmm.py
+ *  * <https://github.com/PyThaiNLP/pythainlp/blob/dev/pythainlp/tokenize/newmm.py>
  *
  * Original Rust implementation: Thanathip Suntorntip
  * Rewrite using native Rust Unicode types: PyThaiNLP Project

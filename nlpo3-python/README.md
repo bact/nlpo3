@@ -141,12 +141,12 @@ The Deepcut model and its ONNX port originate from
 
 ### Requirements
 
-- [Rust 2018 Edition](https://www.rust-lang.org/tools/install)
-- Python 3.7 or newer (PyO3's minimum supported version)
+- [Rust 2021 Edition](https://www.rust-lang.org/tools/install)
+- Python 3.9 or newer
 - Python Development Headers
   - Ubuntu: `sudo apt-get install python3-dev`
   - macOS: No action needed
-- [PyO3](https://github.com/PyO3/pyo3) - already included in `Cargo.toml`
+- [PyO3](https://github.com/PyO3/pyo3) — already included in `Cargo.toml`
 - [setuptools-rust](https://github.com/PyO3/setuptools-rust)
 
 ### Steps
@@ -162,7 +162,7 @@ which can be installed by pip.
 To install a wheel from a local directory:
 
 ```bash
-pip install dist/nlpo3-1.3.1-cp311-cp311-macosx_12_0_x86_64.whl 
+pip install dist/nlpo3-2.0.0-cp311-cp311-macosx_12_0_x86_64.whl
 ```
 
 ### Test

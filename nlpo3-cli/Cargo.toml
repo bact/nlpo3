@@ -1,9 +1,13 @@
 [package]
 name = "nlpo3-cli"
-version = "0.2.1-dev"
-edition = "2018"
+version = "2.0.0"
+edition = "2021"
 license = "Apache-2.0"
-authors = ["Vee Satayamas <5ssgdxltv@relay.firefox.com>"]
+authors = [
+    "Thanathip Suntorntip Gorlph",
+    "Arthit Suriyawongkul",
+    "Vee Satayamas",
+]
 description = "Command line interface for nlpO3, a Thai natural language processing library"
 categories = ["text-processing", "command-line-utilities"]
 keywords = ["thai", "tokenizer", "nlp", "word-segmentation", "cli"]
@@ -17,5 +21,5 @@ name = "nlpo3"
 path = "src/main.rs"
 
 [dependencies]
-clap = "3.0.0-beta.2"
-nlpo3 = { version = "1.4", path = ".." }
+clap = { version = "4.5", features = ["derive"] }
+nlpo3 = { version = "2.0", path = ".." }

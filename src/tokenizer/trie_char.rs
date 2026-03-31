@@ -58,7 +58,7 @@ impl TrieNode {
         }
         self.children
             .entry(chars[0])
-            .or_insert_with(TrieNode::new)
+            .or_default()
             .add_word(&chars[1..]);
     }
 

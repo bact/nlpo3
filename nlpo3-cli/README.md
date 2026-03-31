@@ -1,5 +1,5 @@
 ---
-SPDX-FileCopyrightText: 2024 PyThaiNLP Project
+SPDX-FileCopyrightText: 2024-2026 PyThaiNLP Project
 SPDX-License-Identifier: Apache-2.0
 ---
 
@@ -19,13 +19,34 @@ cargo install nlpo3-cli
 ## Usage
 
 ```bash
-nlpo3 help
+nlpo3 --help
+nlpo3 segment --help
 ```
 
 ## Example
 
+Tokenize from standard input using the built-in dictionary:
+
 ```bash
 echo "ฉันกินข้าว" | nlpo3 segment
+```
+
+Tokenize using a custom dictionary file:
+
+```bash
+echo "ฉันกินข้าว" | nlpo3 segment --dict-path /path/to/dict.txt
+```
+
+Use a custom word delimiter:
+
+```bash
+echo "ฉันกินข้าว" | nlpo3 segment --word-delimiter " "
+```
+
+Enable safe mode (avoids long run times on ambiguous input):
+
+```bash
+echo "ฉันกินข้าว" | nlpo3 segment --safe
 ```
 
 ## License

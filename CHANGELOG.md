@@ -7,6 +7,8 @@ conventions. Version numbers follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-03-31
+
 ### Added
 
 - `src/tokenizer/dict_backend.rs`: `DictBackend` trait that decouples the
@@ -17,11 +19,18 @@ conventions. Version numbers follow [Semantic Versioning](https://semver.org/).
   zero-copy `as_str()` slicing.
 - `src/tokenizer/fst_dict.rs`: `FstDictionary` — a memory-efficient dictionary
   backed by `fst::Set` (minimized finite-state automaton). Stores the 62 k-word
-  Thai dictionary in ~0.85 MB (≈14 bytes/word) compared with ~43 MB (≈699
-  bytes/word) for `TrieChar`.
+  Thai dictionary in ~0.85 MB (≈14 bytes/word) compared with ~43 MB
+  (≈699 bytes/word) for `TrieChar`.
 - `src/tokenizer/newmm.rs`: `NewmmFstTokenizer` — a concrete tokenizer struct
   (CharString + FstDictionary backend) with the same `new()` / `from_word_list()`
   API as `NewmmTokenizer`. Implements `Tokenizer`.
+- `src/tokenizer/deepcut.rs`: `DeepcutTokenizer` — CNN-based Thai word tokenizer
+  using ONNX inference via `tract-onnx`. Based on
+  [LEKCut](https://github.com/PyThaiNLP/LEKCut) and
+  [deepcut](https://github.com/rkcosmos/deepcut).
+  Enabled by the `deepcut` Cargo feature.
+- Python binding: `DeepcutTokenizer` class and `segment_deepcut()` function,
+  backed by a process-level `OnceLock` singleton for the default model.
 - `benches/tokenizer.rs`: updated Criterion benchmark suite covering all three
   tokenizers (`NewmmTokenizer`, `NewmmFstTokenizer`, `DeepcutTokenizer`).
   `DeepcutTokenizer` benchmarks are feature-gated (`--features deepcut`).
@@ -29,8 +38,11 @@ conventions. Version numbers follow [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **Breaking**: all `Cargo.toml` editions updated from 2018 to 2021.
+- **Breaking**: version bumped to 2.0.0 across all packages (nlpo3, nlpo3-cli,
+  nlpo3-python, nlpo3-nodejs).
 - `src/tokenizer/newmm.rs`:
-  - `NewmmTokenizer<D: DictBackend = TrieChar>` is generic over the backend.
+  - `NewmmTokenizer<D: DictBackend = TrieChar>` is now generic over the backend.
     The default (no angle brackets) is unchanged: `CharString + TrieChar`.
   - `NewmmFstTokenizer` replaces the old `NewmmTokenizerFst` type alias.
     It is now a standalone concrete struct with clean `new()` / `from_word_list()`
@@ -46,12 +58,23 @@ conventions. Version numbers follow [Semantic Versioning](https://semver.org/).
   `create_dict_fst`.
 - `src/tokenizer.rs`: exports `dict_backend` module.
 - `Cargo.toml`: removed `bytecount` and `regex-syntax`; added `fst = "0.4.7"`.
+- `nlpo3-cli`: updated `clap` from 3.0.0-beta.2 to 4.x; migrated from
+  `clap::Clap` derive macro to `clap::Parser`; improved help text and error
+  messages.
+- `nlpo3-nodejs/src/lib.rs`: fixed `if let Some(_)` → `contains_key()`;
+  updated SPDX headers; added `Arthit Suriyawongkul` as contributor in
+  `Cargo.toml`; fixed typo in `package.json` contributor name.
+- `nlpo3-python/src/lib.rs`: updated SPDX headers and author attribution.
+- `CITATION.cff` and `nlpo3-python/CITATION.cff`: updated version and
+  release date.
 
 ### Removed
 
-- `src/four_bytes_str/custom_string.rs` — four-byte string encoding.
-- `src/four_bytes_str/custom_regex.rs` — regex-pattern transformation.
-- `src/four_bytes_str.rs` — module declaration.
+- **Breaking**: `src/four_bytes_str/custom_string.rs` — four-byte string
+  encoding removed. Use `CharString` instead.
+- **Breaking**: `src/four_bytes_str/custom_regex.rs` — regex-pattern
+  transformation removed.
+- **Breaking**: `src/four_bytes_str.rs` — module declaration removed.
 - `benches/tokenizer.rs`: removed `old_impl` module and the four benchmark
   groups that compared old 4-byte encoding vs new `CharString`
   (`string_construction`, `char_access`, `tcc_pos`, `encode_plus_tcc`).
@@ -66,4 +89,5 @@ All three tokenizers use the same `Tokenizer` trait and are interchangeable:
 | `NewmmFstTokenizer` | 29.5 µs | 2 225 µs | **~0.85 MB** |
 | `DeepcutTokenizer` | ONNX-based | ONNX-based | ~3.9 MB model |
 
-[Unreleased]: https://github.com/PyThaiNLP/nlpo3/compare/main...HEAD
+[Unreleased]: https://github.com/PyThaiNLP/nlpo3/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/PyThaiNLP/nlpo3/compare/v1.4.0...v2.0.0

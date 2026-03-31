@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2024 PyThaiNLP Project
+// SPDX-FileCopyrightText: 2024-2026 PyThaiNLP Project
 // SPDX-License-Identifier: Apache-2.0
 
 use std::sync::Mutex;
@@ -16,14 +16,14 @@ lazy_static! {
 // Load a dictionary file to a tokenizer,
 // and add that tokenizer to the tokenizer collection.
 //
-// Dictionary file must one word per line.
-// If successful, will insert a NewmmTokenizer to TOKENIZER_COLLECTION.
-// returns a tuple of string of loading result and a boolean
+// Dictionary file must have one word per line.
+// If successful, inserts a NewmmTokenizer to TOKENIZER_COLLECTION.
+// Returns a result string.
 fn load_dict(mut cx: FunctionContext) -> JsResult<JsString> {
     let mut tokenizer_col_lock = TOKENIZER_COLLECTION.lock().unwrap();
     let file_path = cx.argument::<JsString>(0)?.value(&mut cx);
     let dict_name = cx.argument::<JsString>(1)?.value(&mut cx);
-    if let Some(_) = tokenizer_col_lock.get(&dict_name) {
+    if tokenizer_col_lock.contains_key(&dict_name) {
         Ok(cx.string(format!(
             "Failed: dictionary {} exists, please use another name.",
             dict_name
@@ -33,7 +33,7 @@ fn load_dict(mut cx: FunctionContext) -> JsResult<JsString> {
         tokenizer_col_lock.insert(dict_name.to_owned(), Box::new(tokenizer));
 
         Ok(cx.string(format!(
-            "Successful: dictionary name {} from file {} has been successfully loaded",
+            "Successful: dictionary name {} from file {} has been successfully loaded.",
             dict_name, file_path
         )))
     }
@@ -41,8 +41,8 @@ fn load_dict(mut cx: FunctionContext) -> JsResult<JsString> {
 
 // Break text into tokens.
 // Use newmm algorithm.
-/// Can use multithreading, but takes a lot of memory.
-/// returns an array of string
+// Can use multithreading, but takes a lot of memory.
+// Returns an array of strings.
 fn segment(mut cx: FunctionContext) -> JsResult<JsArray> {
     let text = cx.argument::<JsString>(0)?.value(&mut cx);
     let dict_name = cx.argument::<JsString>(1)?.value(&mut cx);

@@ -87,7 +87,7 @@ This updates `Cargo.toml` with:
 
 ```toml
 [dependencies]
-nlpo3 = "1.4.0"
+nlpo3 = "2.0.0"
 ```
 
 #### Example
@@ -156,7 +156,7 @@ See more at [nlpo3-cli](./nlpo3-cli/).
 
 ### Requirements
 
-- [Rust 2018 Edition](https://www.rust-lang.org/tools/install)
+- [Rust 2021 Edition](https://www.rust-lang.org/tools/install)
 
 ### Steps
 

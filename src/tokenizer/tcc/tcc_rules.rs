@@ -57,7 +57,7 @@ lazy_static! {
             r"^(เccีtย)[เ-ไก-ฮ]k",   // look ahead 1
             r"^(เc[ิีุู]tย)[เ-ไก-ฮ]k", // look ahead 2
         ]
-        .map(|p| replace_tcc_symbol(p))
+        .map(replace_tcc_symbol)
         .join("|")
     )
     .unwrap();
@@ -67,7 +67,7 @@ lazy_static! {
             r"^(เccีtย)[เ-ไก-ฮ]k",    // เccีtย(?=[เ-ไก-ฮ]|$)
             r"^(เc[ิีุู]tย)[เ-ไก-ฮ]k", // เc[ิีุู]tย(?=[เ-ไก-ฮ]|$)
         ]
-        .map(|p| replace_tcc_symbol(p))
+        .map(replace_tcc_symbol)
         .join("|")
     )
     .unwrap();
