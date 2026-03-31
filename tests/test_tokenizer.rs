@@ -305,3 +305,60 @@ fn test_thai_number() {
         ["USD", "๑,๙๘๔.๔๒"]
     );
 }
+
+// ---------------------------------------------------------------------------
+// NewmmFstTokenizer (CharString + FstDictionary backend)
+// ---------------------------------------------------------------------------
+
+use nlpo3::tokenizer::newmm::NewmmFstTokenizer;
+
+#[test]
+fn test_fst_new_and_basic_segment() {
+    let mut path = env!("CARGO_MANIFEST_DIR").to_string();
+    path.push_str(DEFAULT_DICT_PATH);
+    let tok = NewmmFstTokenizer::new(&path);
+    let result = tok.segment_to_string(FIRST_TEXT, false, false);
+    assert!(!result.is_empty(), "result should not be empty");
+    assert_eq!(result.concat(), FIRST_TEXT, "tokens must reconstruct the input");
+}
+
+#[test]
+fn test_fst_from_word_list() {
+    let words = vec!["สวัสดี".to_string(), "ประเทศ".to_string(), "ไทย".to_string()];
+    let tok = NewmmFstTokenizer::from_word_list(words);
+    let result = tok.segment_to_string("สวัสดีประเทศไทย", false, false);
+    assert_eq!(result.concat(), "สวัสดีประเทศไทย");
+}
+
+#[test]
+fn test_fst_matches_trie_output() {
+    // Both backends must produce identical tokenization for the same input.
+    let mut path = env!("CARGO_MANIFEST_DIR").to_string();
+    path.push_str(DEFAULT_DICT_PATH);
+    let tok_trie = NewmmTokenizer::new(&path);
+    let tok_fst = NewmmFstTokenizer::new(&path);
+    for text in &[FIRST_TEXT, SECOND_TEXT] {
+        let trie_out = tok_trie.segment_to_string(text, false, false);
+        let fst_out = tok_fst.segment_to_string(text, false, false);
+        assert_eq!(
+            trie_out, fst_out,
+            "NewmmTokenizer and NewmmFstTokenizer must produce identical output for {:?}",
+            text
+        );
+    }
+}
+
+#[test]
+fn test_tokenizer_trait_switchable() {
+    // Demonstrates that both tokenizers satisfy &dyn Tokenizer.
+    use nlpo3::tokenizer::tokenizer_trait::Tokenizer;
+    let mut path = env!("CARGO_MANIFEST_DIR").to_string();
+    path.push_str(DEFAULT_DICT_PATH);
+    let trie: Box<dyn Tokenizer> = Box::new(NewmmTokenizer::new(&path));
+    let fst: Box<dyn Tokenizer> = Box::new(NewmmFstTokenizer::new(&path));
+    let text = "สวัสดีประเทศไทย";
+    assert_eq!(
+        trie.segment_to_string(text, false, false),
+        fst.segment_to_string(text, false, false),
+    );
+}

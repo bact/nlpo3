@@ -82,8 +82,11 @@ impl TrieNode {
 
 /// Character-based trie storing a set of words.
 ///
-/// Words are indexed by their Unicode scalar values (`char`), allowing the
-/// trie to operate natively on UTF-8 text without any intermediate encoding.
+/// Words are decoded to Unicode scalar values (`char`) on insertion, and the
+/// trie branches on those `char` values.  This allows the trie to work
+/// directly with Rust's standard UTF-8 string types without any intermediate
+/// encoding: each `&str` is decoded once on the way in, and lookups compare
+/// decoded `char` values.
 #[derive(Debug)]
 pub struct TrieChar {
     words: HashSet<String>,

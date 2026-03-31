@@ -94,34 +94,48 @@ impl Display for BFSSearchError {
 
 impl Error for BFSSearchError {}
 
-/// Dictionary-based maximal-matching tokenizer.
+/// Dictionary-based maximal-matching tokenizer (CharString + TrieChar).
 ///
-/// The type parameter `D` selects the dictionary backend:
+/// Uses `CharString` for native UTF-8 text and `TrieChar` for fast dictionary
+/// prefix lookup.  This is the **default and fastest** combination for
+/// end-to-end tokenization.
 ///
-/// - `D = TrieChar` *(default)* — fastest prefix lookup, higher memory use.
-/// - `D = FstDictionary` — compact memory (~49× smaller), slower lookup.
+/// To use a more memory-efficient dictionary backend, see [`NewmmFstTokenizer`].
 ///
-/// Because both string representation (`CharString`) and dictionary backend
-/// (`D`) are independent, you can mix and match freely:
+/// All dictionary-based tokenizers implement the shared [`Tokenizer`] trait,
+/// so switching between them requires only a single line change:
 ///
 /// ```ignore
-/// // Default: CharString + TrieChar — maximum tokenization speed.
-/// let tok = NewmmTokenizer::new("words_th.txt");
+/// use nlpo3::tokenizer::newmm::{NewmmTokenizer, NewmmFstTokenizer};
+/// use nlpo3::tokenizer::tokenizer_trait::Tokenizer;
 ///
-/// // Memory-efficient alternative: CharString + FstDictionary.
-/// let tok_fst = NewmmTokenizerFst::new_fst("words_th.txt");
+/// // Maximum speed (CharString + TrieChar):
+/// let tok: Box<dyn Tokenizer> = Box::new(NewmmTokenizer::new("words_th.txt"));
+///
+/// // Compact memory (CharString + FstDictionary):
+/// let tok: Box<dyn Tokenizer> = Box::new(NewmmFstTokenizer::new("words_th.txt"));
 /// ```
 #[derive(Debug)]
 pub struct NewmmTokenizer<D: DictBackend = TrieChar> {
     dict: Box<D>,
 }
 
-/// Type alias for a `NewmmTokenizer` backed by `FstDictionary`.
+/// Memory-efficient dictionary-based tokenizer (CharString + FstDictionary).
 ///
-/// Provides the same tokenization quality as the default `NewmmTokenizer`
-/// (which uses `TrieChar`) at a fraction of the dictionary memory, at the
-/// cost of slower per-lookup speed.
-pub type NewmmTokenizerFst = NewmmTokenizer<super::fst_dict::FstDictionary>;
+/// Uses the same `CharString` representation and the same maximal-matching
+/// algorithm as [`NewmmTokenizer`], but stores the dictionary in a minimized
+/// finite-state automaton ([`FstDictionary`]).  This reduces dictionary memory
+/// by ~49× at the cost of slower per-lookup speed.
+///
+/// Implements the same [`Tokenizer`] trait as [`NewmmTokenizer`] and
+/// `DeepcutTokenizer`, so tokenizers are interchangeable at any call site
+/// that accepts `&dyn Tokenizer`.
+///
+/// [`FstDictionary`]: super::fst_dict::FstDictionary
+#[derive(Debug)]
+pub struct NewmmFstTokenizer {
+    inner: NewmmTokenizer<super::fst_dict::FstDictionary>,
+}
 
 impl NewmmTokenizer<TrieChar> {
     /// Create a tokenizer from a dictionary file (TrieChar backend).
@@ -141,21 +155,45 @@ impl NewmmTokenizer<TrieChar> {
     }
 }
 
-impl NewmmTokenizerFst {
+impl NewmmFstTokenizer {
     /// Create a tokenizer from a dictionary file (FstDictionary backend).
-    pub fn new_fst(dict_path: &str) -> Self {
-        NewmmTokenizer {
-            dict: Box::from(
-                create_dict_fst(DictSource::FilePath(PathBuf::from(dict_path))).unwrap(),
-            ),
+    pub fn new(dict_path: &str) -> Self {
+        Self {
+            inner: NewmmTokenizer {
+                dict: Box::from(
+                    create_dict_fst(DictSource::FilePath(PathBuf::from(dict_path))).unwrap(),
+                ),
+            },
         }
     }
 
     /// Create a tokenizer from a word list (FstDictionary backend).
-    pub fn from_word_list_fst(word_list: Vec<String>) -> Self {
-        NewmmTokenizer {
-            dict: Box::from(create_dict_fst(DictSource::WordList(word_list)).unwrap()),
+    pub fn from_word_list(word_list: Vec<String>) -> Self {
+        Self {
+            inner: NewmmTokenizer {
+                dict: Box::from(create_dict_fst(DictSource::WordList(word_list)).unwrap()),
+            },
         }
+    }
+
+    /// Add words to the tokenizer's dictionary.
+    pub fn add_word(&mut self, word_list: &[&str]) {
+        self.inner.add_word(word_list);
+    }
+
+    /// Remove words from the tokenizer's dictionary.
+    pub fn remove_word(&mut self, word_list: &[&str]) {
+        self.inner.remove_word(word_list);
+    }
+}
+
+impl Tokenizer for NewmmFstTokenizer {
+    fn segment(&self, text: &str, safe: bool, parallel: bool) -> AnyResult<Vec<String>> {
+        self.inner.segment(text, safe, parallel)
+    }
+
+    fn segment_to_string(&self, text: &str, safe: bool, parallel: bool) -> Vec<String> {
+        self.inner.segment_to_string(text, safe, parallel)
     }
 }
 

@@ -119,6 +119,16 @@ pub struct FstDictionary {
     removals: HashSet<String>,
 }
 
+impl fmt::Debug for FstDictionary {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("FstDictionary")
+            .field("fst_bytes", &self.base.as_fst().as_bytes().len())
+            .field("additions", &self.additions.len())
+            .field("removals", &self.removals.len())
+            .finish()
+    }
+}
+
 impl FstDictionary {
     /// Build a dictionary from an iterator of word strings.
     ///
@@ -250,7 +260,6 @@ impl FstDictionary {
 
     /// Return the total number of entries (base + additions − removals).
     pub fn len(&self) -> usize {
-        use fst::Streamer;
         let mut stream = self.base.stream();
         let mut base_count: usize = 0;
         while stream.next().is_some() {
