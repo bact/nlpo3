@@ -9,10 +9,12 @@
 //! - **Dictionary backend**: `TrieChar` (fast lookup) vs `FstDictionary` (compact)
 //!
 //! Because `CharString` and `DictBackend` are orthogonal, all four combinations
-//! are valid. This file benchmarks the two most relevant end-to-end combinations:
+//! are valid. This file benchmarks three end-to-end combinations:
 //!
-//! - **`NewmmTokenizer`** = `CharString` + `TrieChar` — maximum speed
-//! - **`NewmmTokenizerFst`** = `CharString` + `FstDictionary` — compact memory
+//! - **`CharString + TrieChar`** (`NewmmTokenizer`) — maximum speed (new default)
+//! - **`FourByteStr + TrieChar`** — old 4-byte TCC overhead with same dict; isolate
+//!   the string-encoding cost
+//! - **`CharString + FstDictionary`** (`NewmmTokenizerFst`) — compact memory
 //!
 //! # Structure
 //!
@@ -24,7 +26,7 @@
 //! | `encode_plus_tcc` | full old/new pipeline |
 //! | `dict_construction` | `TrieChar::new` vs `FstDictionary::from_words` |
 //! | `prefix_lookup` | `TrieChar::prefix_ref` vs `FstDictionary::prefix_lengths` |
-//! | `full_tokenization` | `CharString`+`TrieChar` vs `CharString`+`FstDictionary` |
+//! | `full_tokenization` | `CharString+TrieChar` vs `FourByteStr+TrieChar` vs `CharString+FstDict` |
 //! | `memory_footprint` | heap-size estimates printed to stderr |
 //!
 //! Run with:
@@ -285,6 +287,214 @@ mod old_impl {
         }
         set
     }
+
+    // -----------------------------------------------------------------------
+    // Full tokenizer using 4-byte string (for TCC) + TrieChar (for dict)
+    //
+    // This reconstruction mirrors NewmmTokenizer::one_cut from newmm.rs,
+    // replacing the single difference: `valid_position` is computed from
+    // the old 4-byte TCC path instead of the new Unicode Regex path.
+    //
+    // Both string representations then use CharString for TrieChar prefix
+    // lookups (the current TrieChar API requires &CharString), so the
+    // measured delta is exactly:
+    //   to_four_bytes() + old_tcc_pos()  vs.  CharString::new() + new_tcc_pos()
+    // -----------------------------------------------------------------------
+
+    use binary_heap_plus::{BinaryHeap, MinComparator};
+    use nlpo3::{char_string::CharString, tokenizer::trie_char::TrieChar};
+    use regex::Regex;
+    use rustc_hash::FxHashMap as HashMap;
+    use std::collections::VecDeque;
+
+    const MAX_GRAPH_SIZE: usize = 50;
+    const USE_MT_THRESHOLD: usize = 10_000;
+
+    const NON_THAI_READABLE: &[&str; 5] = &[
+        r"^[-a-zA-Z]+",
+        r"^[0-9]+([,\.][0-9]+)*",
+        r"^[๐-๙]+([,\.][๐-๙]+)*",
+        r"^[ \t]+",
+        r"^\r?\n",
+    ];
+
+    lazy_static::lazy_static! {
+        static ref NON_THAI: Regex =
+            Regex::new(&NON_THAI_READABLE.join("|")).unwrap();
+        static ref THAI_TWOCHARS: Regex =
+            Regex::new(r"^[ก-ฮ]{0,2}$").unwrap();
+    }
+
+    fn bfs_paths(
+        graph: &HashMap<usize, Vec<usize>>,
+        start: usize,
+        goal: usize,
+        queue: &mut VecDeque<(usize, Vec<usize>)>,
+    ) -> Vec<usize> {
+        queue.clear();
+        let mut init = Vec::with_capacity(goal.saturating_sub(start));
+        init.push(start);
+        queue.push_back((start, init));
+        while let Some((v, path)) = queue.pop_front() {
+            if let Some(nexts) = graph.get(&v) {
+                for &next in nexts {
+                    if next != goal {
+                        let mut p = path.clone();
+                        p.push(next);
+                        queue.push_back((next, p));
+                    } else {
+                        let mut p = path;
+                        p.push(next);
+                        return p;
+                    }
+                }
+            }
+        }
+        // Fallback: return direct edge (should not happen with valid TCC positions).
+        vec![start, goal]
+    }
+
+    /// Segment `text` using the **old** 4-byte TCC path with **TrieChar** for
+    /// dictionary lookups.
+    ///
+    /// The overhead vs `NewmmTokenizer` (`CharString + TrieChar`) is:
+    ///   `to_four_bytes(text)` + `old_tcc_pos(&four_bytes)` on top of the
+    ///   identical `CharString::new(text)` + TrieChar prefix-lookup work.
+    ///
+    /// Safe mode (long-text splitting) is omitted; `safe=false` is sufficient
+    /// to isolate the string-encoding overhead for the benchmark.
+    pub fn segment_four_bytes_trie(text: &str, dict: &TrieChar) -> Vec<String> {
+        if text.is_empty() {
+            return vec![];
+        }
+
+        // OLD path: encode to 4-byte and run old bytes::Regex TCC.
+        let four_bytes = to_four_bytes(text);
+        let valid_position = tcc_pos(&four_bytes);
+
+        // Build CharString once — needed for O(1) substring views used by TrieChar.
+        let text_cs = CharString::new(text);
+        let text_length = text_cs.chars_len();
+
+        let mut reused_queue: VecDeque<(usize, Vec<usize>)> = VecDeque::with_capacity(10);
+        let mut graph_size: usize = 0;
+        let mut graph: HashMap<usize, Vec<usize>> = HashMap::default();
+        graph.reserve(text_length / 10);
+        let mut result: Vec<&str> = Vec::with_capacity(text_length / 10);
+
+        let mut position_list: BinaryHeap<usize, MinComparator> = BinaryHeap::new_min();
+        let mut existing: HashSet<usize> = HashSet::default();
+        existing.reserve(text_length / 10);
+        position_list.push(0);
+        existing.insert(0);
+        let mut end_pos: usize = 0;
+
+        while position_list.peek().map_or(false, |&p| p < text_length) {
+            if let Some(begin_pos) = position_list.pop() {
+                let sub = text_cs.substring(begin_pos, text_cs.chars_len());
+                let prefixes = TrieChar::prefix_ref(&sub, dict);
+                for wlen in prefixes {
+                    let cand = begin_pos + wlen;
+                    if valid_position.contains(&cand) {
+                        match graph.get_mut(&begin_pos) {
+                            Some(v) => v.push(cand),
+                            None => {
+                                graph.insert(begin_pos, vec![cand]);
+                            }
+                        }
+                        graph_size += 1;
+                        if existing.insert(cand) {
+                            position_list.push(cand);
+                        }
+                        if graph_size > MAX_GRAPH_SIZE {
+                            break;
+                        }
+                    }
+                }
+
+                let pl_len = position_list.len();
+                if pl_len == 1 {
+                    if let Some(&first) = position_list.peek() {
+                        let path = bfs_paths(&graph, end_pos, first, &mut reused_queue);
+                        graph_size = 0;
+                        for &pos in path.iter().skip(1) {
+                            result.push(text_cs.substring_as_str(end_pos, pos));
+                            end_pos = pos;
+                        }
+                    }
+                } else if pl_len == 0 {
+                    let sub_str = sub.as_str();
+                    match NON_THAI.find(sub_str) {
+                        Some(m) => {
+                            let chars = sub_str[..m.end()].chars().count();
+                            end_pos = begin_pos + chars;
+                        }
+                        None => {
+                            let mut done = false;
+                            for pos in begin_pos + 1..text_length {
+                                if valid_position.contains(&pos) {
+                                    let prefix = text_cs.substring(pos, text_length);
+                                    let prefixes2 = TrieChar::prefix_ref(&prefix, dict);
+                                    let valid: Vec<usize> = if prefixes2.len()
+                                        >= USE_MT_THRESHOLD
+                                    {
+                                        prefixes2
+                                            .into_iter()
+                                            .filter(|&wl| {
+                                                let np = pos + wl;
+                                                valid_position.contains(&np)
+                                                    && !THAI_TWOCHARS.is_match(
+                                                        text_cs.substring_as_str(pos, pos + wl),
+                                                    )
+                                            })
+                                            .collect()
+                                    } else {
+                                        prefixes2
+                                            .into_iter()
+                                            .filter(|&wl| {
+                                                let np = pos + wl;
+                                                valid_position.contains(&np)
+                                                    && !THAI_TWOCHARS.is_match(
+                                                        text_cs.substring_as_str(pos, pos + wl),
+                                                    )
+                                            })
+                                            .collect()
+                                    };
+                                    if !valid.is_empty() {
+                                        end_pos = pos;
+                                        done = true;
+                                        break;
+                                    }
+                                    if NON_THAI.is_match(prefix.as_str()) {
+                                        end_pos = pos;
+                                        done = true;
+                                        break;
+                                    }
+                                }
+                            }
+                            if !done {
+                                end_pos = text_length;
+                            }
+                        }
+                    }
+
+                    let tok = text_cs.substring_as_str(begin_pos, end_pos);
+                    match graph.get_mut(&begin_pos) {
+                        Some(v) => v.push(end_pos),
+                        None => {
+                            graph.insert(begin_pos, vec![end_pos]);
+                        }
+                    }
+                    graph_size += 1;
+                    result.push(tok);
+                    if existing.insert(end_pos) {
+                        position_list.push(end_pos);
+                    }
+                }
+            }
+        }
+        result.into_iter().map(|s| s.to_string()).collect()
+    }
 }
 
 // ===========================================================================
@@ -501,13 +711,16 @@ fn bench_prefix_lookup(c: &mut Criterion) {
 }
 
 // ===========================================================================
-// 7. End-to-end tokenization: CharString+TrieChar vs CharString+FstDictionary
+// 7. End-to-end tokenization: three combinations compared
 //
-// Both backends use the same CharString string representation, so the
-// difference measures only the dictionary prefix-lookup hot path.
+// All three use TrieChar for dict lookups. The difference between the first
+// two is the string representation; the third adds FstDictionary for memory
+// comparison.
 //
-// `NewmmTokenizer`    = CharString + TrieChar     (default, max speed)
-// `NewmmTokenizerFst` = CharString + FstDictionary (compact memory)
+// `CharString + TrieChar`    = new tokenizer (NewmmTokenizer default)
+// `FourByteStr + TrieChar`   = old 4-byte TCC + CharString for TrieChar; measures
+//                              the encoding overhead of the 4-byte approach
+// `CharString + FstDict`     = new tokenizer with compact dictionary backend
 // ===========================================================================
 
 fn bench_full_tokenization(c: &mut Criterion) {
@@ -516,6 +729,11 @@ fn bench_full_tokenization(c: &mut Criterion) {
     let tok_trie = NewmmTokenizer::new(&path);
     // Memory-efficient backend: CharString + FstDictionary
     let tok_fst = NewmmTokenizerFst::new_fst(&path);
+
+    // Build a separate TrieChar for the 4-byte benchmark
+    let word_list = load_word_list();
+    let char_words: Vec<CharString> = word_list.iter().map(|w| CharString::new(w)).collect();
+    let trie = TrieChar::new(&char_words);
 
     let mut group = c.benchmark_group("full_tokenization");
 
@@ -526,7 +744,7 @@ fn bench_full_tokenization(c: &mut Criterion) {
     ] {
         group.throughput(Throughput::Bytes(text.len() as u64));
 
-        // CharString + TrieChar (fastest combination)
+        // CharString + TrieChar (new default — maximum speed)
         group.bench_with_input(
             BenchmarkId::new("CharString+TrieChar/safe=false", label),
             text,
@@ -536,6 +754,20 @@ fn bench_full_tokenization(c: &mut Criterion) {
             BenchmarkId::new("CharString+TrieChar/safe=true", label),
             text,
             |b, t| b.iter(|| black_box(tok_trie.segment(black_box(t), true, false).unwrap())),
+        );
+
+        // FourByteStr + TrieChar (old 4-byte TCC + TrieChar dict, safe=false only)
+        //
+        // Extra overhead vs CharString+TrieChar: `to_four_bytes()` + old
+        // `bytes::Regex` TCC on top of the identical CharString+TrieChar work.
+        group.bench_with_input(
+            BenchmarkId::new("FourByteStr+TrieChar/safe=false", label),
+            text,
+            |b, t| {
+                b.iter(|| {
+                    black_box(old_impl::segment_four_bytes_trie(black_box(t), &trie))
+                })
+            },
         );
 
         // CharString + FstDictionary (memory-efficient combination)
@@ -601,7 +833,8 @@ fn bench_memory_footprint(c: &mut Criterion) {
     // --- dictionary ---
     let fst_bytes = fst_dict.fst_size_bytes();
     let total_chars: usize = word_list.iter().map(|w| w.chars().count()).sum();
-    // 48 bytes per String: 24 bytes stack (ptr+len+cap) + ~24 bytes average heap allocation header.
+    // 48 bytes per String: 24 bytes stack (ptr+len+cap) + ~24 bytes heap overhead
+    // (allocation header; varies by allocator — jemalloc, glibc, etc.).
     let words_set_bytes: usize = word_list.iter().map(|w| w.len() + 48).sum();
     // ~80 bytes per trie edge: 24-byte TrieNode stack + HashMap bucket (~56 bytes for char+ptr entry).
     let trie_estimate = words_set_bytes + total_chars * 80;

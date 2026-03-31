@@ -159,29 +159,48 @@ memory is constrained and lookups are infrequent.
 
 ---
 
-## 7. Full end-to-end tokenization: `CharString + TrieChar` vs `CharString + FstDictionary`
+## 7. Full end-to-end tokenization: three-way comparison
 
-This benchmark directly answers the question "can we use native string with
-TrieChar to get maximum speed?" by measuring both combinations.
+This section answers two questions simultaneously:
 
-Both backends use the same `CharString` string representation. The difference
-is solely due to the dictionary prefix-lookup hot path.
+1. **"Can we use native string with TrieChar to get maximum speed?"**
+   → Yes. `CharString + TrieChar` is the new default and is the fastest combination.
 
-| Backend | short (28 chars) | medium (219 chars) | long (937 chars) |
+2. **"How much overhead does the 4-byte string encoding add over native string,
+   when the dictionary backend is held constant (TrieChar)?"**
+   → Very little: ~4–10% slowdown.
+
+The `FourByteStr + TrieChar` benchmark reconstructs the old tokenizer loop
+(4-byte TCC + TrieChar) inline in the benchmark file. The only differences
+from `CharString + TrieChar` are:
+- `to_four_bytes(text)`: builds the 4-byte buffer (extra O(n) allocation)
+- `old_tcc_pos(&four_bytes)`: runs `bytes::Regex` on the 4-byte buffer instead
+  of the Unicode `Regex` on UTF-8
+
+Both paths then create a `CharString` and use identical `TrieChar::prefix_ref`
+calls for the dictionary, so the delta is exactly the string-encoding overhead.
+
+| Combination | short (28 ch) | medium (219 ch) | long (937 ch) |
 |---|---:|---:|---:|
-| `CharString + TrieChar` (safe=false) | **2.40 µs** | **34.2 µs** | **140 µs** |
-| `CharString + TrieChar` (safe=true) | **2.61 µs** | **36.0 µs** | **186 µs** |
-| `CharString + FstDictionary` (safe=false) | 25.7 µs | 244 µs | 1 843 µs |
-| `CharString + FstDictionary` (safe=true) | 25.6 µs | 218 µs | 1 411 µs |
-| Speed ratio (TrieChar vs FstDict, safe=false) | **11× faster** | **7× faster** | **13× faster** |
+| `CharString + TrieChar` (safe=false) | **2.51 µs** | **29.3 µs** | **142 µs** |
+| `CharString + TrieChar` (safe=true) | 2.64 µs | 33.0 µs | 188 µs |
+| `FourByteStr + TrieChar` (safe=false) | 2.77 µs | 30.9 µs | 148 µs |
+| Overhead (FourByte vs CharString) | **+10%** | **+5%** | **+4%** |
+| `CharString + FstDict` (safe=false) | 29.4 µs | 280 µs | 2 175 µs |
+| Speed ratio (TrieChar vs FstDict) | **12× faster** | **10× faster** | **15× faster** |
 
-**Conclusion:** `CharString + TrieChar` is the fastest combination for
-end-to-end tokenization. The `FstDictionary` backend is 7–13× slower due to
-the high per-lookup overhead of the streaming FST automaton compared with the
-O(k) pointer-chasing trie.
+**Conclusions:**
+
+- `CharString + TrieChar` is the fastest combination. The 4-byte encoding adds
+  only 4–10% overhead on top of the same TrieChar work, confirming that the
+  string representation choice matters much less than the dictionary choice.
+- The bottleneck in the tokenizer is the TrieChar prefix-lookup loop (called
+  at every character position), not the string encoding.
+- `FstDictionary` is 10–15× slower end-to-end regardless of string
+  representation, confirming that the two axes are independent.
 
 Use `NewmmTokenizer` (default, `CharString + TrieChar`) for maximum speed.
-Use `NewmmTokenizerFst` (`CharString + FstDictionary`) when the 50-fold memory
+Use `NewmmTokenizerFst` (`CharString + FstDictionary`) when the 49× memory
 saving is more important than throughput.
 
 ---
@@ -229,16 +248,32 @@ is the strongly preferred choice.
 | Per-char heap | 8.0 bytes/char | 6.3 bytes/char | **21% smaller** |
 | Code removed | – | 580 lines | Custom codec gone |
 
-### Dictionary backend comparison (both use `CharString`)
+### String-representation vs dictionary-backend (section 7 three-way comparison)
 
-| Backend | Tokenization speed | Dictionary size | Suitable for |
-|---|---|---|---|
-| `TrieChar` (default) | **2.4 – 140 µs** per call | ~43 MB | Maximum throughput |
-| `FstDictionary` | 25 – 1 843 µs per call | **0.85 MB** | Memory-constrained deployments |
-| Ratio | **TrieChar is 7 – 13× faster** | **FstDict is 49× smaller** | — |
+| Combination | Tokenization speed | Overhead vs new default |
+|---|---|---|
+| `CharString + TrieChar` (new default) | **2.5 – 142 µs** per call | — |
+| `FourByteStr + TrieChar` (old encoding) | 2.8 – 148 µs per call | **+4 – 10%** |
+| `CharString + FstDictionary` | 29 – 2 175 µs per call | **10 – 15× slower** |
 
-The two design dimensions are independent: `CharString` is the string
-representation and `DictBackend` is the dictionary interface. Use
-`NewmmTokenizer` (`CharString + TrieChar`) for maximum tokenization speed.
+Key finding: the 4-byte string encoding adds only **4–10% overhead** over the
+new `CharString` approach when the dictionary backend is the same (`TrieChar`).
+The dominant cost driver is the **dictionary backend choice**, not the string
+representation. `FstDictionary` is 10–15× slower end-to-end regardless of the
+string representation.
+
+The two design dimensions are independent:
+- `CharString` vs 4-byte encoding: ~4–10% end-to-end difference (minor)
+- `TrieChar` vs `FstDictionary`: 10–15× end-to-end difference (dominant)
+
+Use `NewmmTokenizer` (`CharString + TrieChar`) for maximum speed.
 Use `NewmmTokenizerFst` (`CharString + FstDictionary`) when memory matters more
 than throughput.
+
+### Dictionary backend
+
+| Backend | Dictionary size | Suitable for |
+|---|---|---|
+| `TrieChar` (default) | ~43 MB | Maximum throughput |
+| `FstDictionary` | **0.85 MB** | Memory-constrained deployments |
+| Ratio | **FstDict is 49× smaller** | — |

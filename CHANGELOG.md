@@ -26,10 +26,14 @@ conventions. Version numbers follow [Semantic Versioning](https://semver.org/).
   `NewmmTokenizer` at ~49× lower dictionary memory, suitable for
   memory-constrained deployments.
 - `benches/tokenizer.rs`: Criterion benchmark suite with direct old-vs-new
-  comparisons and all-combination `full_tokenization` group:
-  `CharString+TrieChar` vs `CharString+FstDictionary`.
+  comparisons and a three-way `full_tokenization` group:
+  `CharString+TrieChar` (new default) vs `FourByteStr+TrieChar`
+  (4-byte encoding with the same TrieChar, isolating the string-encoding
+  overhead) vs `CharString+FstDictionary` (compact memory). The
+  `FourByteStr+TrieChar` comparison is implemented via a reconstructed
+  `old_impl::segment_four_bytes_trie` function in the benchmark file.
 - `BENCHMARK_RESULTS.md`: recorded benchmark measurements and analysis,
-  including the new section 7 on end-to-end backend comparison.
+  including the new section 7 three-way comparison and updated summary.
 
 ### Changed
 
@@ -68,12 +72,22 @@ conventions. Version numbers follow [Semantic Versioning](https://semver.org/).
 | TCC boundary detection | 705 – 27 455 ns | 733 – 28 381 ns (≈ same) |
 | Per-char heap usage | 8.0 bytes/char | 6.3 bytes/char (**21% smaller**) |
 
-**Dictionary backend comparison** (both use `CharString`):
+**Three-way end-to-end comparison** (section 7 of `BENCHMARK_RESULTS.md`):
 
-| Backend | Tokenization | Dictionary size |
+| Combination | Speed | Overhead vs new |
 |---|---|---|
-| `TrieChar` (default) | **2.4 – 140 µs** per call | ~43 MB |
-| `FstDictionary` | 25 – 1 843 µs per call | **0.85 MB** |
-| Ratio | **TrieChar is 7 – 13× faster** | **FstDict is 49× smaller** |
+| `CharString + TrieChar` (new default) | **2.5 – 142 µs** | — |
+| `FourByteStr + TrieChar` (old 4-byte encoding) | 2.8 – 148 µs | **+4 – 10%** |
+| `CharString + FstDictionary` | 29 – 2 175 µs | **10 – 15× slower** |
+
+The 4-byte string encoding adds only **4–10% overhead** over `CharString` when
+the dictionary backend is the same. The dominant cost is the dictionary backend.
+
+**Dictionary backend comparison:**
+
+| Backend | Dictionary size |
+|---|---|
+| `TrieChar` (default) | ~43 MB |
+| `FstDictionary` | **0.85 MB** (49× smaller) |
 
 [Unreleased]: https://github.com/PyThaiNLP/nlpo3/compare/main...HEAD
