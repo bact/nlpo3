@@ -6,6 +6,7 @@
  */
 use crate::char_string::CharString;
 
+use super::fst_dict::FstDictionary;
 use super::trie_char::TrieChar as Trie;
 use std::io::BufReader;
 use std::{error::Error, io::prelude::*};
@@ -39,6 +40,18 @@ pub fn create_dict_trie(source: DictSource) -> Result<Trie, Box<dyn Error>> {
             let char_word_list: Vec<CharString> =
                 word_list.into_iter().map(|w| CharString::new(&w)).collect();
             Ok(Trie::new(&char_word_list))
+        }
+    }
+}
+
+pub fn create_dict_fst(source: DictSource) -> Result<FstDictionary, Box<dyn Error>> {
+    match source {
+        DictSource::FilePath(file_path) => {
+            let content = std::fs::read_to_string(file_path)?;
+            FstDictionary::from_words(content.lines().map(|l| l.trim()))
+        }
+        DictSource::WordList(word_list) => {
+            FstDictionary::from_words(word_list.iter().map(|s| s.as_str()))
         }
     }
 }

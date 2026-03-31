@@ -2,25 +2,36 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! Benchmarks comparing the **old** four-byte-encoded string approach to the
-//! **new** native-Rust `CharString` implementation.
+//! **new** native-Rust `CharString` implementation, and comparing the two
+//! independent axes of the new design:
+//!
+//! - **String representation**: old 4-byte encoding vs new `CharString` (native UTF-8)
+//! - **Dictionary backend**: `TrieChar` (fast lookup) vs `FstDictionary` (compact)
+//!
+//! Because `CharString` and `DictBackend` are orthogonal, all four combinations
+//! are valid. This file benchmarks the two most relevant end-to-end combinations:
+//!
+//! - **`NewmmTokenizer`** = `CharString` + `TrieChar` — maximum speed
+//! - **`NewmmTokenizerFst`** = `CharString` + `FstDictionary` — compact memory
 //!
 //! # Structure
 //!
-//! | Group | Old | New |
-//! |-------|-----|-----|
-//! | `string_construction` | `old::to_four_bytes` | `CharString::new` |
-//! | `char_access` | `old::get_char_at` (byte-index) | `CharString::get_char_at` |
-//! | `tcc_pos` | `old::tcc_pos` (`bytes::Regex` on 4-byte buf) | `tcc_pos` (`Regex` on UTF-8) |
-//! | `full_tokenization` | *N/A – old tokenizer removed* | `NewmmTokenizer::segment` |
-//! | `dict_construction` | `TrieChar::new` | `TrieChar::new` + `FstDictionary::from_words` |
-//! | `prefix_lookup` | `TrieChar::prefix_ref` | `TrieChar::prefix_ref` + `FstDictionary::prefix_lengths` |
-//! | `memory_footprint` | estimated / printed | estimated / printed |
+//! | Group | Benchmarks |
+//! |-------|-----------|
+//! | `string_construction` | old 4-byte+char_vec vs `CharString::new` |
+//! | `char_access` | `Vec<char>` vs position-table vs `str::chars().nth` |
+//! | `tcc_pos` | `bytes::Regex` on 4-byte vs `Regex` on UTF-8 |
+//! | `encode_plus_tcc` | full old/new pipeline |
+//! | `dict_construction` | `TrieChar::new` vs `FstDictionary::from_words` |
+//! | `prefix_lookup` | `TrieChar::prefix_ref` vs `FstDictionary::prefix_lengths` |
+//! | `full_tokenization` | `CharString`+`TrieChar` vs `CharString`+`FstDictionary` |
+//! | `memory_footprint` | heap-size estimates printed to stderr |
 //!
 //! Run with:
 //! ```sh
 //! cargo bench
 //! # or just a specific group:
-//! cargo bench -- tcc_pos
+//! cargo bench -- full_tokenization
 //! ```
 //! HTML reports land in `target/criterion/`.
 
@@ -29,7 +40,7 @@ use nlpo3::{
     char_string::CharString,
     tokenizer::{
         fst_dict::FstDictionary,
-        newmm::NewmmTokenizer,
+        newmm::{NewmmTokenizer, NewmmTokenizerFst},
         tcc::tcc_tokenizer::tcc_pos,
         trie_char::TrieChar,
         tokenizer_trait::Tokenizer,
@@ -490,12 +501,22 @@ fn bench_prefix_lookup(c: &mut Criterion) {
 }
 
 // ===========================================================================
-// 7. End-to-end tokenization (new implementation only — old tokenizer removed)
+// 7. End-to-end tokenization: CharString+TrieChar vs CharString+FstDictionary
+//
+// Both backends use the same CharString string representation, so the
+// difference measures only the dictionary prefix-lookup hot path.
+//
+// `NewmmTokenizer`    = CharString + TrieChar     (default, max speed)
+// `NewmmTokenizerFst` = CharString + FstDictionary (compact memory)
 // ===========================================================================
 
 fn bench_full_tokenization(c: &mut Criterion) {
     let path = dict_path();
-    let tok = NewmmTokenizer::new(&path);
+    // Default backend: CharString + TrieChar
+    let tok_trie = NewmmTokenizer::new(&path);
+    // Memory-efficient backend: CharString + FstDictionary
+    let tok_fst = NewmmTokenizerFst::new_fst(&path);
+
     let mut group = c.benchmark_group("full_tokenization");
 
     for (label, text) in &[
@@ -505,15 +526,28 @@ fn bench_full_tokenization(c: &mut Criterion) {
     ] {
         group.throughput(Throughput::Bytes(text.len() as u64));
 
+        // CharString + TrieChar (fastest combination)
         group.bench_with_input(
-            BenchmarkId::new("new/segment_safe=false", label),
+            BenchmarkId::new("CharString+TrieChar/safe=false", label),
             text,
-            |b, t| b.iter(|| black_box(tok.segment(black_box(t), false, false).unwrap())),
+            |b, t| b.iter(|| black_box(tok_trie.segment(black_box(t), false, false).unwrap())),
         );
         group.bench_with_input(
-            BenchmarkId::new("new/segment_safe=true", label),
+            BenchmarkId::new("CharString+TrieChar/safe=true", label),
             text,
-            |b, t| b.iter(|| black_box(tok.segment(black_box(t), true, false).unwrap())),
+            |b, t| b.iter(|| black_box(tok_trie.segment(black_box(t), true, false).unwrap())),
+        );
+
+        // CharString + FstDictionary (memory-efficient combination)
+        group.bench_with_input(
+            BenchmarkId::new("CharString+FstDict/safe=false", label),
+            text,
+            |b, t| b.iter(|| black_box(tok_fst.segment(black_box(t), false, false).unwrap())),
+        );
+        group.bench_with_input(
+            BenchmarkId::new("CharString+FstDict/safe=true", label),
+            text,
+            |b, t| b.iter(|| black_box(tok_fst.segment(black_box(t), true, false).unwrap())),
         );
     }
     group.finish();
@@ -567,8 +601,10 @@ fn bench_memory_footprint(c: &mut Criterion) {
     // --- dictionary ---
     let fst_bytes = fst_dict.fst_size_bytes();
     let total_chars: usize = word_list.iter().map(|w| w.chars().count()).sum();
+    // 48 bytes per String: 24 bytes stack (ptr+len+cap) + ~24 bytes average heap allocation header.
     let words_set_bytes: usize = word_list.iter().map(|w| w.len() + 48).sum();
-    let trie_estimate = words_set_bytes + total_chars * 80; // ~80 bytes per trie edge
+    // ~80 bytes per trie edge: 24-byte TrieNode stack + HashMap bucket (~56 bytes for char+ptr entry).
+    let trie_estimate = words_set_bytes + total_chars * 80;
 
     eprintln!("\nDictionary ({} words):", n_words);
     eprintln!(

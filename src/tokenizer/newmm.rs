@@ -18,10 +18,11 @@
 use std::{collections::VecDeque, error::Error, fmt::Display, path::PathBuf};
 
 use super::{
-    dict_reader::{create_dict_trie, DictSource},
+    dict_backend::DictBackend,
+    dict_reader::{create_dict_fst, create_dict_trie, DictSource},
     tcc::tcc_tokenizer,
     tokenizer_trait::Tokenizer,
-    trie_char::TrieChar as Trie,
+    trie_char::TrieChar,
 };
 use crate::char_string::{rfind_space_char_index, CharString};
 
@@ -93,13 +94,37 @@ impl Display for BFSSearchError {
 
 impl Error for BFSSearchError {}
 
+/// Dictionary-based maximal-matching tokenizer.
+///
+/// The type parameter `D` selects the dictionary backend:
+///
+/// - `D = TrieChar` *(default)* — fastest prefix lookup, higher memory use.
+/// - `D = FstDictionary` — compact memory (~49× smaller), slower lookup.
+///
+/// Because both string representation (`CharString`) and dictionary backend
+/// (`D`) are independent, you can mix and match freely:
+///
+/// ```ignore
+/// // Default: CharString + TrieChar — maximum tokenization speed.
+/// let tok = NewmmTokenizer::new("words_th.txt");
+///
+/// // Memory-efficient alternative: CharString + FstDictionary.
+/// let tok_fst = NewmmTokenizerFst::new_fst("words_th.txt");
+/// ```
 #[derive(Debug)]
-pub struct NewmmTokenizer {
-    dict: Box<Trie>,
+pub struct NewmmTokenizer<D: DictBackend = TrieChar> {
+    dict: Box<D>,
 }
 
-impl NewmmTokenizer {
-    /// Create a new tokenizer using a dictionary from a text file.
+/// Type alias for a `NewmmTokenizer` backed by `FstDictionary`.
+///
+/// Provides the same tokenization quality as the default `NewmmTokenizer`
+/// (which uses `TrieChar`) at a fraction of the dictionary memory, at the
+/// cost of slower per-lookup speed.
+pub type NewmmTokenizerFst = NewmmTokenizer<super::fst_dict::FstDictionary>;
+
+impl NewmmTokenizer<TrieChar> {
+    /// Create a tokenizer from a dictionary file (TrieChar backend).
     pub fn new(dict_path: &str) -> Self {
         NewmmTokenizer {
             dict: Box::from(
@@ -108,24 +133,44 @@ impl NewmmTokenizer {
         }
     }
 
-    /// Create a new tokenizer using a dictionary from a vector of strings.
+    /// Create a tokenizer from a word list (TrieChar backend).
     pub fn from_word_list(word_list: Vec<String>) -> Self {
         NewmmTokenizer {
             dict: Box::from(create_dict_trie(DictSource::WordList(word_list)).unwrap()),
         }
     }
+}
 
+impl NewmmTokenizerFst {
+    /// Create a tokenizer from a dictionary file (FstDictionary backend).
+    pub fn new_fst(dict_path: &str) -> Self {
+        NewmmTokenizer {
+            dict: Box::from(
+                create_dict_fst(DictSource::FilePath(PathBuf::from(dict_path))).unwrap(),
+            ),
+        }
+    }
+
+    /// Create a tokenizer from a word list (FstDictionary backend).
+    pub fn from_word_list_fst(word_list: Vec<String>) -> Self {
+        NewmmTokenizer {
+            dict: Box::from(create_dict_fst(DictSource::WordList(word_list)).unwrap()),
+        }
+    }
+}
+
+impl<D: DictBackend> NewmmTokenizer<D> {
     /// Add words to the tokenizer's dictionary.
     pub fn add_word(&mut self, word_list: &[&str]) {
         for word in word_list {
-            self.dict.add(&CharString::new(word));
+            self.dict.add_word(&CharString::new(word));
         }
     }
 
     /// Remove words from the tokenizer's dictionary.
     pub fn remove_word(&mut self, word_list: &[&str]) {
         for word in word_list {
-            self.dict.remove(&CharString::new(word));
+            self.dict.remove_word(&CharString::new(word));
         }
     }
 
@@ -162,7 +207,7 @@ impl NewmmTokenizer {
 
     fn one_cut<'a>(
         input: &'a CharString,
-        custom_dict: &Trie,
+        custom_dict: &D,
     ) -> AnyResult<Vec<&'a str>> {
         let text = input;
         let input_char_len = text.chars_len();
@@ -189,7 +234,7 @@ impl NewmmTokenizer {
         } {
             if let Some(begin_position) = position_list.pop() {
                 let sub_text_prefix = text.substring(begin_position, text.chars_len());
-                let prefixes = Trie::prefix_ref(&sub_text_prefix, custom_dict);
+                let prefixes = custom_dict.prefix_lengths_of(&sub_text_prefix);
                 for word_length in prefixes {
                     let end_position_candidate = begin_position + word_length;
                     if valid_position.contains(&end_position_candidate) {
@@ -251,7 +296,7 @@ impl NewmmTokenizer {
                                     let prefix = text.substring(position, text_length);
 
                                     let list_of_prefixes =
-                                        Trie::prefix_ref(&prefix, custom_dict);
+                                        custom_dict.prefix_lengths_of(&prefix);
                                     let valid_word_filter = |word_length: &usize| {
                                         let new_position = position + word_length;
                                         let is_valid =
@@ -318,7 +363,7 @@ impl NewmmTokenizer {
 
     fn internal_segment(
         input: &CharString,
-        custom_dict: &Trie,
+        custom_dict: &D,
         safe: bool,
         parallel: bool,
     ) -> AnyResult<Vec<String>> {
@@ -399,7 +444,7 @@ impl NewmmTokenizer {
     }
 }
 
-impl Tokenizer for NewmmTokenizer {
+impl<D: DictBackend> Tokenizer for NewmmTokenizer<D> {
     fn segment(&self, text: &str, safe: bool, parallel: bool) -> AnyResult<Vec<String>> {
         Self::internal_segment(&CharString::new(text), &self.dict, safe, parallel)
     }

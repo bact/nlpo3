@@ -9,6 +9,10 @@ conventions. Version numbers follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `src/tokenizer/dict_backend.rs`: new `DictBackend` trait that decouples the
+  string representation (`CharString`) from the dictionary backend. Implemented
+  by both `TrieChar` and `FstDictionary`, making the two design axes
+  independent and explicitly composable.
 - `src/char_string.rs`: new `CharString` type — a native UTF-8 string view
   with a precomputed byte-position index that gives O(1) character access and
   O(1) zero-copy `as_str()` slicing. Replaces the former four-byte-per-char
@@ -17,11 +21,15 @@ conventions. Version numbers follow [Semantic Versioning](https://semver.org/).
   backed by `fst::Set` (minimized finite-state automaton). Stores the 62 k-word
   Thai dictionary in ~0.85 MB (≈14 bytes/word) compared with ~43 MB (≈699
   bytes/word) for the `TrieChar` (a trie with per-node `HashMap` children).
+- `src/tokenizer/newmm.rs`: `NewmmTokenizerFst` type alias
+  (`NewmmTokenizer<FstDictionary>`) — same tokenization quality as the default
+  `NewmmTokenizer` at ~49× lower dictionary memory, suitable for
+  memory-constrained deployments.
 - `benches/tokenizer.rs`: Criterion benchmark suite with direct old-vs-new
-  comparisons covering string construction, character access, TCC boundary
-  detection, encode + TCC pipeline, dictionary construction, prefix lookup,
-  full tokenization, and memory footprint.
-- `BENCHMARK_RESULTS.md`: recorded benchmark measurements and analysis.
+  comparisons and all-combination `full_tokenization` group:
+  `CharString+TrieChar` vs `CharString+FstDictionary`.
+- `BENCHMARK_RESULTS.md`: recorded benchmark measurements and analysis,
+  including the new section 7 on end-to-end backend comparison.
 
 ### Changed
 
@@ -33,11 +41,15 @@ conventions. Version numbers follow [Semantic Versioning](https://semver.org/).
   directly instead of the four-byte encoded `&[u8]` slice.
 - `src/tokenizer/trie_char.rs`: `TrieChar` stores words as `String` (UTF-8),
   navigates trie nodes by `char`, and returns prefix-match lengths as
-  `Vec<usize>` instead of `Vec<&[u8]>`.
-- `src/tokenizer/newmm.rs`: `NewmmTokenizer` uses `CharString` throughout;
-  non-Thai patterns compiled with `regex::Regex` (verbose `(?x)` flag removed
-  to avoid silent whitespace-stripping inside character classes).
-- `src/tokenizer/dict_reader.rs`: updated to use `CharString`.
+  `Vec<usize>` instead of `Vec<&[u8]>`. Implements `DictBackend`.
+- `src/tokenizer/fst_dict.rs`: implements `DictBackend`.
+- `src/tokenizer/newmm.rs`: `NewmmTokenizer<D: DictBackend = TrieChar>` is now
+  generic over the dictionary backend. The default (`NewmmTokenizer` without
+  angle brackets) is unchanged. `NewmmTokenizerFst` is a new type alias for
+  `NewmmTokenizer<FstDictionary>`.
+- `src/tokenizer/dict_reader.rs`: updated to use `CharString`; added
+  `create_dict_fst` for building `FstDictionary` from a file or word list.
+- `src/tokenizer.rs`: exports the new `dict_backend` module.
 - `Cargo.toml`: removed `bytecount` and `regex-syntax` dependencies (no longer
   needed); added `fst = "0.4.7"` and `criterion = "0.5"` (dev dependency).
 
@@ -54,7 +66,14 @@ conventions. Version numbers follow [Semantic Versioning](https://semver.org/).
 |---|---|---|
 | String construction | 228 – 4 739 ns | 81 – 1 152 ns (**2.8 – 4.1× faster**) |
 | TCC boundary detection | 705 – 27 455 ns | 733 – 28 381 ns (≈ same) |
-| Per-char heap usage | 8.0 bytes/char | 6.3 bytes/char (**21% less**) |
-| Dictionary size (FST vs TrieChar) | ~43 MB | 0.85 MB (**49× less**) |
+| Per-char heap usage | 8.0 bytes/char | 6.3 bytes/char (**21% smaller**) |
+
+**Dictionary backend comparison** (both use `CharString`):
+
+| Backend | Tokenization | Dictionary size |
+|---|---|---|
+| `TrieChar` (default) | **2.4 – 140 µs** per call | ~43 MB |
+| `FstDictionary` | 25 – 1 843 µs per call | **0.85 MB** |
+| Ratio | **TrieChar is 7 – 13× faster** | **FstDict is 49× smaller** |
 
 [Unreleased]: https://github.com/PyThaiNLP/nlpo3/compare/main...HEAD

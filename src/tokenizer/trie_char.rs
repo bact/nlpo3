@@ -12,6 +12,7 @@
  *   https://en.wikipedia.org/wiki/Trie
  */
 use crate::char_string::CharString;
+use crate::tokenizer::dict_backend::DictBackend;
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 
 #[derive(Debug)]
@@ -164,6 +165,24 @@ impl TrieChar {
             }
         }
         result
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DictBackend implementation
+// ---------------------------------------------------------------------------
+
+impl DictBackend for TrieChar {
+    fn prefix_lengths_of(&self, prefix: &CharString) -> Vec<usize> {
+        TrieChar::prefix_ref(prefix, self)
+    }
+
+    fn add_word(&mut self, word: &CharString) {
+        self.add(word);
+    }
+
+    fn remove_word(&mut self, word: &CharString) {
+        self.remove(word);
     }
 }
 

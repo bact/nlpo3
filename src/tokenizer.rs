@@ -3,6 +3,7 @@
 
 #[cfg(feature = "deepcut")]
 pub mod deepcut;
+pub mod dict_backend;
 mod dict_reader;
 pub mod fst_dict;
 pub mod newmm;

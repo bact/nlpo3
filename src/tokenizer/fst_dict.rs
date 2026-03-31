@@ -32,6 +32,8 @@ use fst::{Automaton, IntoStreamer, Set, Streamer};
 use rustc_hash::FxHashSet as HashSet;
 use std::{error::Error, fmt};
 
+use crate::{char_string::CharString, tokenizer::dict_backend::DictBackend};
+
 // ---------------------------------------------------------------------------
 // Custom automaton: accepts all keys that are prefixes of a query string
 // ---------------------------------------------------------------------------
@@ -198,8 +200,13 @@ impl FstDictionary {
     /// (4 chars) and `text` starts with "กาแฟดี", the result contains
     /// `[2, 4]`.
     ///
-    /// The results are deduplicated but not sorted.
+    /// The results are deduplicated and do not include a guaranteed order.
     pub fn prefix_lengths(&self, text: &str) -> Vec<usize> {
+        // Use a HashSet to collect lengths so duplicates are impossible even
+        // when the same character length appears from both the base FST and
+        // the delta additions set (e.g., two different words of the same
+        // length are both prefixes of `text`).
+        let mut seen = rustc_hash::FxHashSet::<usize>::default();
         let mut result: Vec<usize> = Vec::new();
 
         // --- base FST search ---
@@ -209,7 +216,10 @@ impl FstDictionary {
             // SAFETY: FST was built from valid UTF-8.
             let word = unsafe { std::str::from_utf8_unchecked(key) };
             if !self.removals.contains(word) {
-                result.push(word.chars().count());
+                let len = word.chars().count();
+                if seen.insert(len) {
+                    result.push(len);
+                }
             }
         }
 
@@ -221,12 +231,11 @@ impl FstDictionary {
             byte_pos += ch.len_utf8();
             char_pos += 1;
             let prefix = &text[..byte_pos];
-            if self.additions.contains(prefix) {
+            if self.additions.contains(prefix) && seen.insert(char_pos) {
                 result.push(char_pos);
             }
         }
 
-        result.dedup();
         result
     }
 
@@ -253,6 +262,24 @@ impl FstDictionary {
     /// Return `true` if the dictionary has no entries.
     pub fn is_empty(&self) -> bool {
         self.len() == 0
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DictBackend implementation
+// ---------------------------------------------------------------------------
+
+impl DictBackend for FstDictionary {
+    fn prefix_lengths_of(&self, prefix: &CharString) -> Vec<usize> {
+        self.prefix_lengths(prefix.as_str())
+    }
+
+    fn add_word(&mut self, word: &CharString) {
+        self.add(word.as_str());
+    }
+
+    fn remove_word(&mut self, word: &CharString) {
+        self.remove(word.as_str());
     }
 }
 

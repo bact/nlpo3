@@ -3,11 +3,16 @@ SPDX-FileCopyrightText: 2024-2026 PyThaiNLP Project
 SPDX-License-Identifier: Apache-2.0
 ---
 
-# Benchmark results: old vs new implementation
+# Benchmark results: old vs new implementation, and dictionary backend comparison
 
-This document records the results of running `cargo bench` after replacing the
-custom four-byte string encoding (`four_bytes_str`) with native Rust types
-(`CharString`, `regex::Regex`, and `FstDictionary`).
+This document records the results of running `cargo bench` after:
+1. Replacing the custom four-byte string encoding (`four_bytes_str`) with
+   native Rust types (`CharString`, `regex::Regex`).
+2. Adding `FstDictionary` as an alternative dictionary backend alongside the
+   existing `TrieChar`.
+3. Confirming that string representation and dictionary backend are
+   **fully orthogonal** through the `DictBackend` trait, and benchmarking all
+   relevant combinations.
 
 Measurements were collected with [Criterion.rs](https://github.com/bheisler/criterion.rs)
 on a single-threaded workload. Each timing is the **mean** of 100 samples
@@ -21,6 +26,27 @@ on a single-threaded workload. Each timing is the **mean** of 100 samples
   - **short** – 28 Unicode characters, Thai-only
   - **medium** – 219 characters, mixed Thai / Latin / CJK / digits
   - **long** – 937 characters, mixed
+
+---
+
+## Design axes: are they orthogonal?
+
+The tokenizer has two independent design choices:
+
+| Axis | Option A | Option B |
+|------|----------|----------|
+| String representation | Old: 4-byte-per-char custom encoding | New: `CharString` (native UTF-8) |
+| Dictionary backend | `TrieChar` (fast lookup, ~43 MB) | `FstDictionary` (compact, ~0.85 MB) |
+
+**Yes, they are orthogonal.** The `DictBackend` trait (`src/tokenizer/dict_backend.rs`)
+decouples the two:
+
+- `TrieChar` implements `DictBackend` via `prefix_lengths_of(prefix: &CharString)`
+- `FstDictionary` implements `DictBackend` via `self.prefix_lengths(prefix.as_str())`
+- `NewmmTokenizer<D: DictBackend>` accepts either
+
+The default `NewmmTokenizer` uses `CharString + TrieChar` (fastest). The
+`NewmmTokenizerFst` type alias uses `CharString + FstDictionary` (compact).
 
 ---
 
@@ -133,15 +159,30 @@ memory is constrained and lookups are infrequent.
 
 ---
 
-## 7. Full end-to-end tokenization (new implementation)
+## 7. Full end-to-end tokenization: `CharString + TrieChar` vs `CharString + FstDictionary`
 
-The old tokenizer is no longer present, so absolute numbers are provided for
-the new implementation as reference.
+This benchmark directly answers the question "can we use native string with
+TrieChar to get maximum speed?" by measuring both combinations.
 
-| Mode | short (28 chars) | medium (219 chars) | long (937 chars) |
+Both backends use the same `CharString` string representation. The difference
+is solely due to the dictionary prefix-lookup hot path.
+
+| Backend | short (28 chars) | medium (219 chars) | long (937 chars) |
 |---|---:|---:|---:|
-| `segment(safe=false)` | 2.63 µs | 30.8 µs | 132 µs |
-| `segment(safe=true)` | 2.62 µs | 34.7 µs | 182 µs |
+| `CharString + TrieChar` (safe=false) | **2.40 µs** | **34.2 µs** | **140 µs** |
+| `CharString + TrieChar` (safe=true) | **2.61 µs** | **36.0 µs** | **186 µs** |
+| `CharString + FstDictionary` (safe=false) | 25.7 µs | 244 µs | 1 843 µs |
+| `CharString + FstDictionary` (safe=true) | 25.6 µs | 218 µs | 1 411 µs |
+| Speed ratio (TrieChar vs FstDict, safe=false) | **11× faster** | **7× faster** | **13× faster** |
+
+**Conclusion:** `CharString + TrieChar` is the fastest combination for
+end-to-end tokenization. The `FstDictionary` backend is 7–13× slower due to
+the high per-lookup overhead of the streaming FST automaton compared with the
+O(k) pointer-chasing trie.
+
+Use `NewmmTokenizer` (default, `CharString + TrieChar`) for maximum speed.
+Use `NewmmTokenizerFst` (`CharString + FstDictionary`) when the 50-fold memory
+saving is more important than throughput.
 
 ---
 
@@ -177,6 +218,8 @@ is the strongly preferred choice.
 
 ## Summary
 
+### Old vs new
+
 | Metric | Old | New | Change |
 |---|---|---|---|
 | String construction | 228 – 4 739 ns | 81 – 1 152 ns | **2.8 – 4.1× faster** |
@@ -184,9 +227,18 @@ is the strongly preferred choice.
 | TCC boundary detection | 705 – 27 455 ns | 733 – 28 381 ns | ≈ same |
 | Encode + TCC total | 841 – 31 193 ns | 831 – 29 785 ns | ≈ same |
 | Per-char heap | 8.0 bytes/char | 6.3 bytes/char | **21% smaller** |
-| Dictionary size | ~43 MB (TrieChar) | 0.85 MB (FST) | **49× smaller** |
 | Code removed | – | 580 lines | Custom codec gone |
 
-The new implementation is significantly faster at string construction, uses
-less memory, eliminates the custom four-byte encoding and the `custom_regex`
-conversion layer, and produces identical tokenization output on all test cases.
+### Dictionary backend comparison (both use `CharString`)
+
+| Backend | Tokenization speed | Dictionary size | Suitable for |
+|---|---|---|---|
+| `TrieChar` (default) | **2.4 – 140 µs** per call | ~43 MB | Maximum throughput |
+| `FstDictionary` | 25 – 1 843 µs per call | **0.85 MB** | Memory-constrained deployments |
+| Ratio | **TrieChar is 7 – 13× faster** | **FstDict is 49× smaller** | — |
+
+The two design dimensions are independent: `CharString` is the string
+representation and `DictBackend` is the dictionary interface. Use
+`NewmmTokenizer` (`CharString + TrieChar`) for maximum tokenization speed.
+Use `NewmmTokenizerFst` (`CharString + FstDictionary`) when memory matters more
+than throughput.
