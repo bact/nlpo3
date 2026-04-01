@@ -290,6 +290,35 @@ fn bench_memory_footprint(c: &mut Criterion) {
     group.finish();
 }
 
+// ===========================================================================
+// 5. Clone cost — Arc-backed dicts make clone O(1)
+//
+// After the 2.0 Arc migration, cloning a tokenizer is a single atomic
+// reference-count increment rather than a full dictionary copy.  These
+// benchmarks verify the O(1) claim and help catch regressions.
+// ===========================================================================
+
+fn bench_clone_cost(c: &mut Criterion) {
+    let path = dict_path();
+    let tok_trie = NewmmTokenizer::new(&path).unwrap();
+    let tok_fst = NewmmFstTokenizer::new(&path).unwrap();
+
+    let mut group = c.benchmark_group("clone_cost");
+    group.sample_size(200);
+
+    // Cloning a NewmmTokenizer<TrieChar> is O(1) — Arc reference-count bump.
+    group.bench_function("NewmmTokenizer::clone", |b| {
+        b.iter(|| black_box(tok_trie.clone()))
+    });
+
+    // Cloning a NewmmFstTokenizer is O(1) — Arc reference-count bump.
+    group.bench_function("NewmmFstTokenizer::clone", |b| {
+        b.iter(|| black_box(tok_fst.clone()))
+    });
+
+    group.finish();
+}
+
 // ---------------------------------------------------------------------------
 // Register all benchmark groups
 // ---------------------------------------------------------------------------
@@ -300,5 +329,6 @@ criterion_group!(
     bench_prefix_lookup,
     bench_full_tokenization,
     bench_memory_footprint,
+    bench_clone_cost,
 );
 criterion_main!(benches);

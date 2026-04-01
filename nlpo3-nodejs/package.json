@@ -38,7 +38,7 @@
     "build": "cargo-cp-artifact -nc ./nlpo3/rust_mod.node -- cargo build --message-format=json-render-diagnostics",
     "release": "cargo-cp-artifact -nc ./nlpo3/rust_mod.node -- cargo build --release --message-format=json-render-diagnostics && tsc",
     "install": "npm run build",
-    "test": "cargo test"
+    "test": "npm run build && tsc && node --test tests/test_tokenizers.js"
   },
   "devDependencies": {
     "cargo-cp-artifact": "^0.1",

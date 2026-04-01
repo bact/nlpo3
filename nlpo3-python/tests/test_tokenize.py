@@ -153,3 +153,48 @@ class TestDeepcutTokenizer(unittest.TestCase):
         self.assertEqual(len(results), 3)
         for r in results:
             self.assertIsInstance(r, list)
+
+
+# ---------------------------------------------------------------------------
+# Error handling
+# ---------------------------------------------------------------------------
+
+
+class TestNewmmTokenizerErrors(unittest.TestCase):
+    def test_bad_dict_path_raises(self):
+        with self.assertRaises(RuntimeError):
+            NewmmTokenizer("/nonexistent/path/to/dict.txt")
+
+
+class TestNewmmFstTokenizerErrors(unittest.TestCase):
+    def test_bad_dict_path_raises(self):
+        with self.assertRaises(RuntimeError):
+            NewmmFstTokenizer("/nonexistent/path/to/dict.txt")
+
+
+# ---------------------------------------------------------------------------
+# Thread safety
+# ---------------------------------------------------------------------------
+
+
+class TestNewmmTokenizerThreadSafety(unittest.TestCase):
+    def test_concurrent_segment(self):
+        import concurrent.futures
+
+        tok = NewmmTokenizer(DICT_FILENAME)
+        texts = ["ไข่คน2021", "ทดสอบ", "สวัสดีครับ"] * 10
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+            results = list(pool.map(tok.segment, texts))
+        self.assertEqual(len(results), 30)
+        for r in results:
+            self.assertIsInstance(r, list)
+
+    def test_concurrent_segment_matches_serial(self):
+        import concurrent.futures
+
+        tok = NewmmTokenizer(DICT_FILENAME)
+        texts = ["ไข่คน2021", "ทดสอบ", "สวัสดีครับ"]
+        serial = [tok.segment(t) for t in texts]
+        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
+            parallel = list(pool.map(tok.segment, texts))
+        self.assertEqual(serial, parallel)
