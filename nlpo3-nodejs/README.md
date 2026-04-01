@@ -122,7 +122,7 @@ Loading a 62k-word dictionary typically takes less than 200 ms.
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `safe` | `boolean` | `false` | Avoid long run times on inputs with many ambiguous word boundaries |
-| `parallel` | `boolean` | `false` | Use Rayon multi-threading internally (higher memory use) |
+| `parallel` | `boolean` | `false` | Use Rayon to tokenize one document in parallel chunks (higher memory use). Best for a single large document; for many short texts, use caller-side worker threads instead. |
 
 `DeepcutTokenizer.segment()` does not accept options; the neural model has a fixed inference path.
 

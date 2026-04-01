@@ -105,6 +105,12 @@ let tokenizer = NewmmTokenizer::new("path/to/dict.file");
 let tokens = tokenizer.segment("ห้องสมุดประชาชน", true, false).unwrap();
 ```
 
+`segment(text, safe, parallel)`: set `parallel = true` to use Rayon to
+tokenize a single large document in parallel chunks (higher memory use).
+For processing many documents concurrently, keep `parallel = false` and
+call `segment()` from multiple threads instead — `NewmmTokenizer` is
+`Send + Sync` and the shared dictionary (`Arc`) incurs no copying.
+
 Create a tokenizer from a vector of strings:
 
 ```rust

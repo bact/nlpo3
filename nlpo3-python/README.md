@@ -65,7 +65,9 @@ tok.segment("สวัสดีครับ")
 # Safe mode — avoids long run times on ambiguous input
 tok.segment("สวัสดีครับ", safe=True)
 
-# Parallel mode — multi-threaded processing (higher memory use)
+# Parallel mode — uses Rayon to tokenize one document in parallel chunks.
+# Best for a single large document. For many short texts, use caller-side
+# threading instead (the tokenizer is thread-safe; see section below).
 tok.segment("สวัสดีครับ", parallel=True)
 ```
 
