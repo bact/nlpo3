@@ -14,7 +14,7 @@
 - [ ] For significant changes, update the CHANGELOG.md file
       to document the changes.
   - [ ] Follow "Keep a Changelog" principles
-        https://keepachangelog.com/en/1.0.0/
+        https://keepachangelog.com/en/1.1.0/
   - [ ] Use semantic versioning for version numbers
         https://semver.org/
   - [ ] If it is a breaking change, indicate it clearly in the changelog.
@@ -201,6 +201,16 @@
       `collections.abc` modules.
       Use the most appropriate data structure for the specific use case
       to optimize performance and memory usage.
+
+## Rust
+
+- [ ] Follow Rust's standard coding style and conventions.
+- [ ] Always use `cargo fmt` to format the code.
+- [ ] Always use `cargo clippy --fix` to automatically fix common issues.
+- [ ] Always use `cargo check` to check for compilation errors.
+- [ ] Always use `cargo audit` to check for security vulnerabilities
+      in dependencies.
+- [ ] Always use `cargo test` to ensure that the code is working as expected.
 
 ## JSON
 

@@ -1,47 +1,51 @@
-// SPDX-FileCopyrightText: 2024 PyThaiNLP Project
+// SPDX-FileCopyrightText: 2024-2026 PyThaiNLP Project
 // SPDX-License-Identifier: Apache-2.0
 
-use clap::Clap;
-use nlpo3::tokenizer::newmm::NewmmTokenizer;
-use nlpo3::tokenizer::tokenizer_trait::Tokenizer;
 use std::io;
 use std::io::BufRead;
+
+use clap::{Parser, Subcommand};
+use nlpo3::tokenizer::newmm::NewmmTokenizer;
+use nlpo3::tokenizer::tokenizer_trait::Tokenizer;
 
 const DEFAULT_DICT: &str =
     include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../words_th.txt"));
 
-#[derive(Clap, Debug)]
-#[clap(name = "nlpo3")]
+#[derive(Parser, Debug)]
+#[command(name = "nlpo3", about = "Thai natural language processing CLI")]
 struct App {
-    #[clap(subcommand)]
+    #[command(subcommand)]
     subcommand: SubCommand,
 }
 
-#[derive(Clap, Debug)]
+#[derive(Subcommand, Debug)]
 enum SubCommand {
-    /// Tokenize a string into words.
-    #[clap()]
+    /// Tokenize text into words, reading from standard input line by line.
     Segment(SegmentOpts),
 }
 
-#[derive(Clap, Debug)]
+#[derive(Parser, Debug)]
 struct SegmentOpts {
-    #[clap(short = 'd', long, default_value = "default")]
+    /// Path to a dictionary file (one word per line).
+    /// Use "default" or omit to use the built-in dictionary.
+    #[arg(short = 'd', long, default_value = "default")]
     dict_path: String,
 
-    #[clap(short = 's', long, default_value = "|")]
+    /// Token delimiter printed between words.
+    #[arg(short = 's', long, default_value = "|")]
     word_delimiter: String,
 
-    /// Run in safe mode to avoid long running edge cases
-    #[clap(short = 'z', long)]
+    /// Enable safe mode to avoid long run times on inputs with many
+    /// ambiguous word boundaries.
+    #[arg(short = 'z', long)]
     safe: bool,
 
-    /// Run in multithread mode
-    #[clap(short = 'p', long)]
+    /// Enable multithread mode (uses more memory).
+    #[arg(short = 'p', long)]
     parallel: bool,
 }
 
-fn main() {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let opt = App::parse();
 
     let SubCommand::Segment(segment_opts) = opt.subcommand;
@@ -57,15 +61,14 @@ fn main() {
         Some(path) => NewmmTokenizer::new(path),
     };
     for line_opt in io::stdin().lock().lines() {
-        let cleaned_line = match line_opt {
-            Ok(line) => line.trim_end_matches('\n').to_string(),
-            Err(e) => panic!("Cannot read line {}", e),
-        };
+        let line = line_opt?;
+        let cleaned_line = line.trim_end_matches('\n');
         let toks = newmm.segment_to_string(
-            &cleaned_line,
+            cleaned_line,
             segment_opts.safe,
             segment_opts.parallel,
         );
         println!("{}", toks.join(segment_opts.word_delimiter.as_str()));
     }
+    Ok(())
 }

@@ -23,7 +23,6 @@ Credits:
     * Rust code: Thanathip Suntorntip
     * Rust rewrite (native Unicode): PyThaiNLP Project
 */
-
 /// Advance `text` forward by `n` Unicode characters, returning the remainder.
 #[inline]
 fn advance_chars(text: &str, n: usize) -> &str {

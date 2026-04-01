@@ -1,14 +1,11 @@
-// SPDX-FileCopyrightText: 2024 PyThaiNLP Project
+// SPDX-FileCopyrightText: 2024-2026 PyThaiNLP Project
 // SPDX-License-Identifier: Apache-2.0
 
 /**
- * Python-binding for nlpO3, an natural language process library.
+ * Python binding for nlpO3, a natural language processing library.
  *
- * Provides a tokenizer.
- *
- * Authors:
- * Thanathip Suntorntip
- * Arthit Suriyawongkul
+ * Original Rust implementation: Thanathip Suntorntip
+ * Rewrite and extension: PyThaiNLP Project
  */
 use std::path::Path;
 use std::sync::{Mutex, OnceLock};

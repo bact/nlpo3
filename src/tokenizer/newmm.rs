@@ -9,8 +9,7 @@
  * with heuristic graph size limit added to avoid exponential wait time.
  *
  * :See Also:
- *  * \
- *   https://github.com/PyThaiNLP/pythainlp/blob/dev/pythainlp/tokenize/newmm.py
+ *  * <https://github.com/PyThaiNLP/pythainlp/blob/dev/pythainlp/tokenize/newmm.py>
  *
  * Original Rust implementation: Thanathip Suntorntip
  * Rewrite using native Rust Unicode types: PyThaiNLP Project
@@ -112,7 +111,7 @@ impl Error for BFSSearchError {}
 /// // Maximum speed (CharString + TrieChar):
 /// let tok: Box<dyn Tokenizer> = Box::new(NewmmTokenizer::new("words_th.txt"));
 ///
-/// // Compact memory (CharString + FstDictionary):
+/// // Compact memory (CharString + FstDict):
 /// let tok: Box<dyn Tokenizer> = Box::new(NewmmFstTokenizer::new("words_th.txt"));
 /// ```
 #[derive(Debug)]
@@ -120,21 +119,21 @@ pub struct NewmmTokenizer<D: DictBackend = TrieChar> {
     dict: Box<D>,
 }
 
-/// Memory-efficient dictionary-based tokenizer (CharString + FstDictionary).
+/// Memory-efficient dictionary-based tokenizer (CharString + FstDict).
 ///
 /// Uses the same `CharString` representation and the same maximal-matching
 /// algorithm as [`NewmmTokenizer`], but stores the dictionary in a minimized
-/// finite-state automaton ([`FstDictionary`]).  This reduces dictionary memory
+/// finite-state automaton ([`FstDict`]).  This reduces dictionary memory
 /// by ~49× at the cost of slower per-lookup speed.
 ///
 /// Implements the same [`Tokenizer`] trait as [`NewmmTokenizer`] and
 /// `DeepcutTokenizer`, so tokenizers are interchangeable at any call site
 /// that accepts `&dyn Tokenizer`.
 ///
-/// [`FstDictionary`]: super::fst_dict::FstDictionary
+/// [`FstDict`]: super::fst_dict::FstDict
 #[derive(Debug)]
 pub struct NewmmFstTokenizer {
-    inner: NewmmTokenizer<super::fst_dict::FstDictionary>,
+    inner: NewmmTokenizer<super::fst_dict::FstDict>,
 }
 
 impl NewmmTokenizer<TrieChar> {
@@ -156,7 +155,7 @@ impl NewmmTokenizer<TrieChar> {
 }
 
 impl NewmmFstTokenizer {
-    /// Create a tokenizer from a dictionary file (FstDictionary backend).
+    /// Create a tokenizer from a dictionary file (FstDict backend).
     pub fn new(dict_path: &str) -> Self {
         Self {
             inner: NewmmTokenizer {
@@ -167,7 +166,7 @@ impl NewmmFstTokenizer {
         }
     }
 
-    /// Create a tokenizer from a word list (FstDictionary backend).
+    /// Create a tokenizer from a word list (FstDict backend).
     pub fn from_word_list(word_list: Vec<String>) -> Self {
         Self {
             inner: NewmmTokenizer {
@@ -226,14 +225,14 @@ impl<D: DictBackend> NewmmTokenizer<D> {
 
         while let Some((vertex, path)) = current_queue.pop_front() {
             if let Some(idk) = graph.get(&vertex) {
-                for position in idk {
-                    if *position != goal {
+                for &position in idk {
+                    if position != goal {
                         let mut appended_path = path.clone();
-                        appended_path.push(*position);
-                        current_queue.push_back((*position, appended_path));
+                        appended_path.push(position);
+                        current_queue.push_back((position, appended_path));
                     } else {
                         let mut appended_path = path;
-                        appended_path.push(*position);
+                        appended_path.push(position);
                         return Ok(appended_path);
                     };
                 }
@@ -265,135 +264,119 @@ impl<D: DictBackend> NewmmTokenizer<D> {
         existing_candidate.insert(0);
         let mut end_position: CharacterIndex = 0;
 
-        while match position_list.peek() {
-            Some(position) if *position < text_length => true,
-            None => false,
-            _ => false,
-        } {
-            if let Some(begin_position) = position_list.pop() {
-                let sub_text_prefix = text.substring(begin_position, text.chars_len());
-                let prefixes = custom_dict.prefix_lengths_of(&sub_text_prefix);
-                for word_length in prefixes {
-                    let end_position_candidate = begin_position + word_length;
-                    if valid_position.contains(&end_position_candidate) {
-                        let target_graph = graph.get_mut(&begin_position);
-                        match target_graph {
-                            Some(existing_path) => {
-                                existing_path.push(end_position_candidate);
-                            }
-                            None => {
-                                graph.insert(begin_position, vec![end_position_candidate]);
-                            }
-                        }
+        while let Some(&begin_position) = position_list.peek()
+            && begin_position < text_length
+        {
+            position_list.pop();
+            let sub_text_prefix = text.substring(begin_position, text.chars_len());
+            let prefixes = custom_dict.prefix_lengths_of(&sub_text_prefix);
+            for word_length in prefixes {
+                let end_position_candidate = begin_position + word_length;
+                if valid_position.contains(&end_position_candidate) {
+                    graph
+                        .entry(begin_position)
+                        .or_default()
+                        .push(end_position_candidate);
 
-                        graph_size += 1;
-                        if !existing_candidate.contains(&end_position_candidate) {
-                            existing_candidate.insert(end_position_candidate);
-                            position_list.push(end_position_candidate);
-                        }
-                        if graph_size > MAX_GRAPH_SIZE {
-                            break;
-                        }
+                    graph_size += 1;
+                    if !existing_candidate.contains(&end_position_candidate) {
+                        existing_candidate.insert(end_position_candidate);
+                        position_list.push(end_position_candidate);
+                    }
+                    if graph_size > MAX_GRAPH_SIZE {
+                        break;
                     }
                 }
-                let position_list_length = position_list.len();
-                if position_list_length == 1 {
-                    // Only one candidate left.
-                    if let Some(first_position_list) = position_list.peek() {
-                        let group_of_end_position_candidate = Self::bfs_paths_graph(
-                            &graph,
-                            end_position,
-                            *first_position_list,
-                            &mut reused_queue,
-                        )?;
-                        graph_size = 0; // reset graph
+            }
+            let position_list_length = position_list.len();
+            if position_list_length == 1 {
+                // Only one candidate left.
+                if let Some(&first_position_list) = position_list.peek() {
+                    let group_of_end_position_candidate = Self::bfs_paths_graph(
+                        &graph,
+                        end_position,
+                        first_position_list,
+                        &mut reused_queue,
+                    )?;
+                    graph_size = 0; // reset graph
 
-                        for position in group_of_end_position_candidate.iter().skip(1) {
-                            let token = text.substring_as_str(end_position, *position);
-                            result_str.push(token);
-                            end_position = *position;
-                        }
-                    } else {
-                        panic!("Incorrect position list");
+                    for &position in group_of_end_position_candidate.iter().skip(1) {
+                        let token = text.substring_as_str(end_position, position);
+                        result_str.push(token);
+                        end_position = position;
                     }
-                } else if position_list_length == 0 {
-                    // No candidate: handle non-dictionary segment.
-                    let sub_str = sub_text_prefix.as_str();
-                    match NON_THAI_PATTERN.find(sub_str) {
-                        // Non-Thai text: skip to end of match.
-                        Some(match_point) => {
-                            let matched_char_count =
-                                sub_str[..match_point.end()].chars().count();
-                            end_position = begin_position + matched_char_count;
-                        }
-                        // Thai text with no dictionary match: find minimum skip.
-                        None => {
-                            let mut finish_without_break = true;
-                            for position in begin_position + 1..text_length {
-                                if valid_position.contains(&position) {
-                                    let prefix = text.substring(position, text_length);
+                } else {
+                    panic!("Incorrect position list");
+                }
+            } else if position_list_length == 0 {
+                // No candidate: handle non-dictionary segment.
+                let sub_str = sub_text_prefix.as_str();
+                match NON_THAI_PATTERN.find(sub_str) {
+                    // Non-Thai text: skip to end of match.
+                    Some(match_point) => {
+                        let matched_char_count =
+                            sub_str[..match_point.end()].chars().count();
+                        end_position = begin_position + matched_char_count;
+                    }
+                    // Thai text with no dictionary match: find minimum skip.
+                    None => {
+                        let mut finish_without_break = true;
+                        for position in begin_position + 1..text_length {
+                            if valid_position.contains(&position) {
+                                let prefix = text.substring(position, text_length);
 
-                                    let list_of_prefixes =
-                                        custom_dict.prefix_lengths_of(&prefix);
-                                    let valid_word_filter = |word_length: &usize| {
-                                        let new_position = position + word_length;
-                                        let is_valid =
-                                            valid_position.contains(&new_position);
-                                        let word_str = text
-                                            .substring_as_str(position, position + word_length);
-                                        let is_two_thai_chars =
-                                            THAI_TWOCHARS_PATTERN.is_match(word_str);
-                                        is_valid && !is_two_thai_chars
+                                let list_of_prefixes =
+                                    custom_dict.prefix_lengths_of(&prefix);
+                                let valid_word_filter = |word_length: &usize| {
+                                    let new_position = position + word_length;
+                                    let is_valid =
+                                        valid_position.contains(&new_position);
+                                    let word_str = text
+                                        .substring_as_str(position, position + word_length);
+                                    let is_two_thai_chars =
+                                        THAI_TWOCHARS_PATTERN.is_match(word_str);
+                                    is_valid && !is_two_thai_chars
+                                };
+                                let valid_words: Vec<usize> =
+                                    if list_of_prefixes.len() >= USE_MULTITHREAD_THRESHOLD {
+                                        list_of_prefixes
+                                            .into_par_iter()
+                                            .filter(valid_word_filter)
+                                            .collect()
+                                    } else {
+                                        list_of_prefixes
+                                            .into_iter()
+                                            .filter(valid_word_filter)
+                                            .collect()
                                     };
-                                    let valid_words: Vec<usize> =
-                                        if list_of_prefixes.len() >= USE_MULTITHREAD_THRESHOLD {
-                                            list_of_prefixes
-                                                .into_par_iter()
-                                                .filter(valid_word_filter)
-                                                .collect()
-                                        } else {
-                                            list_of_prefixes
-                                                .into_iter()
-                                                .filter(valid_word_filter)
-                                                .collect()
-                                        };
 
-                                    if !valid_words.is_empty() {
-                                        end_position = position;
-                                        finish_without_break = false;
-                                        break;
-                                    };
-                                    if NON_THAI_PATTERN.is_match(prefix.as_str()) {
-                                        end_position = position;
-                                        finish_without_break = false;
-                                        break;
-                                    }
+                                if !valid_words.is_empty() {
+                                    end_position = position;
+                                    finish_without_break = false;
+                                    break;
+                                };
+                                if NON_THAI_PATTERN.is_match(prefix.as_str()) {
+                                    end_position = position;
+                                    finish_without_break = false;
+                                    break;
                                 }
                             }
-                            if finish_without_break {
-                                end_position = text_length;
-                            }
+                        }
+                        if finish_without_break {
+                            end_position = text_length;
                         }
                     }
-
-                    if let Some(existing_path) = graph.get_mut(&begin_position) {
-                        existing_path.push(end_position);
-                        graph_size += 1;
-                        let token = text.substring_as_str(begin_position, end_position);
-                        result_str.push(token);
-                        position_list.push(end_position);
-                        existing_candidate.insert(end_position);
-                    } else {
-                        let mut graph_elem: Vec<usize> = Vec::with_capacity(10);
-                        graph_elem.push(end_position);
-                        graph.insert(begin_position, graph_elem);
-                        graph_size += 1;
-                        let token = text.substring_as_str(begin_position, end_position);
-                        result_str.push(token);
-                        position_list.push(end_position);
-                        existing_candidate.insert(end_position);
-                    }
                 }
+
+                graph
+                    .entry(begin_position)
+                    .or_insert_with(|| Vec::with_capacity(10))
+                    .push(end_position);
+                graph_size += 1;
+                let token = text.substring_as_str(begin_position, end_position);
+                result_str.push(token);
+                position_list.push(end_position);
+                existing_candidate.insert(end_position);
             }
         }
         Ok(result_str)
@@ -432,7 +415,7 @@ impl<D: DictBackend> NewmmTokenizer<D> {
                     let word_tokens = Self::one_cut(&sample, custom_dict)?;
                     let mut token_max_index = 0;
                     let mut token_max_length = 0;
-                    for (idx, token) in word_tokens.iter().enumerate() {
+                    for (idx, &token) in word_tokens.iter().enumerate() {
                         let tok_chars = token.chars().count();
                         if tok_chars >= token_max_length {
                             token_max_length = tok_chars;
@@ -440,7 +423,7 @@ impl<D: DictBackend> NewmmTokenizer<D> {
                         }
                     }
                     cut_pos = TEXT_SCAN_BEGIN;
-                    for token in word_tokens.iter().take(token_max_index) {
+                    for &token in word_tokens.iter().take(token_max_index) {
                         cut_pos += token.chars().count();
                     }
                 }

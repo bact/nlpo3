@@ -4,7 +4,7 @@
 /**
  * Memory-efficient dictionary backed by a Finite State Transducer (FST).
  *
- * The `FstDictionary` stores the base word set as an `fst::Set`, which
+ * The `FstDict` stores the base word set as an `fst::Set`, which
  * minimizes the deterministic automaton and typically uses only a few bytes
  * per entry (compared with tens of bytes per trie node in the `TrieChar`
  * implementation).
@@ -20,9 +20,9 @@
  * # Construction
  *
  * ```rust,ignore
- * use nlpo3::tokenizer::fst_dict::FstDictionary;
+ * use nlpo3::tokenizer::fst_dict::FstDict;
  *
- * let dict = FstDictionary::from_words(["กา", "กาแฟ", "แฟ"].iter().copied())?;
+ * let dict = FstDict::from_words(["กา", "กาแฟ", "แฟ"].iter().copied())?;
  * let lengths = dict.prefix_lengths("กาแฟดี");
  * assert!(lengths.contains(&2)); // "กา" (2 chars)
  * assert!(lengths.contains(&3)); // "กาแฟ" (4 bytes, 3 chars? let's recount)
@@ -110,7 +110,7 @@ impl Error for FstDictError {}
 ///
 /// Words are UTF-8 strings stored in a minimized finite state automaton.
 /// Dynamic additions and removals are tracked in small delta sets.
-pub struct FstDictionary {
+pub struct FstDict {
     /// Immutable base set, sorted lexicographically.
     base: Set<Vec<u8>>,
     /// Words added dynamically after construction.
@@ -119,9 +119,9 @@ pub struct FstDictionary {
     removals: HashSet<String>,
 }
 
-impl fmt::Debug for FstDictionary {
+impl fmt::Debug for FstDict {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("FstDictionary")
+        f.debug_struct("FstDict")
             .field("fst_bytes", &self.base.as_fst().as_bytes().len())
             .field("additions", &self.additions.len())
             .field("removals", &self.removals.len())
@@ -129,7 +129,7 @@ impl fmt::Debug for FstDictionary {
     }
 }
 
-impl FstDictionary {
+impl FstDict {
     /// Build a dictionary from an iterator of word strings.
     ///
     /// The words are sorted before being inserted into the FST (required by
@@ -223,7 +223,11 @@ impl FstDictionary {
         let automaton = PrefixOf::new(text);
         let mut stream = self.base.search(&automaton).into_stream();
         while let Some(key) = stream.next() {
-            // SAFETY: FST was built from valid UTF-8.
+            // SAFETY: All keys in the FST were inserted as valid UTF-8
+            // strings in `from_words`. The FST stores raw bytes verbatim
+            // and never modifies them, so every key is guaranteed to be
+            // valid UTF-8. Using the unchecked variant avoids a redundant
+            // byte-scan on every iteration of this hot lookup loop.
             let word = unsafe { std::str::from_utf8_unchecked(key) };
             if !self.removals.contains(word) {
                 let len = word.chars().count();
@@ -278,7 +282,7 @@ impl FstDictionary {
 // DictBackend implementation
 // ---------------------------------------------------------------------------
 
-impl DictBackend for FstDictionary {
+impl DictBackend for FstDict {
     fn prefix_lengths_of(&self, prefix: &CharString) -> Vec<usize> {
         self.prefix_lengths(prefix.as_str())
     }
@@ -300,8 +304,8 @@ impl DictBackend for FstDictionary {
 mod tests {
     use super::*;
 
-    fn make_dict(words: &[&str]) -> FstDictionary {
-        FstDictionary::from_words(words.iter().copied()).unwrap()
+    fn make_dict(words: &[&str]) -> FstDict {
+        FstDict::from_words(words.iter().copied()).unwrap()
     }
 
     #[test]

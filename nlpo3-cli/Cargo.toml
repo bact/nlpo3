@@ -1,21 +1,38 @@
 [package]
 name = "nlpo3-cli"
-version = "0.2.1-dev"
-edition = "2018"
+version = "2.0.0"
+edition = "2024"
+rust-version = "1.88.0"
 license = "Apache-2.0"
-authors = ["Vee Satayamas <5ssgdxltv@relay.firefox.com>"]
+authors = [
+    "Vee Satayamas <5ssgdxltv@relay.firefox.com>",
+    "Arthit Suriyawongkul",
+]
 description = "Command line interface for nlpO3, a Thai natural language processing library"
 categories = ["text-processing", "command-line-utilities"]
-keywords = ["thai", "tokenizer", "nlp", "word-segmentation", "cli"]
+keywords = [
+    "thai",
+    "tokenizer",
+    "tokenization",
+    "text-processing",
+    "nlp",
+    "natural-language-processing",
+    "word-segmentation",
+    "pythainlp",
+    "cli",
+]
 homepage = "https://github.com/PyThaiNLP/nlpo3/tree/main/nlpo3-cli/"
 repository = "https://github.com/PyThaiNLP/nlpo3/"
 documentation = "https://github.com/PyThaiNLP/nlpo3/tree/main/nlpo3-cli/README.md"
 readme = "README.md"
+
+[badges]
+maintenance = { status = "actively-developed" }
 
 [[bin]]
 name = "nlpo3"
 path = "src/main.rs"
 
 [dependencies]
-clap = "3.0.0-beta.2"
-nlpo3 = { version = "1.4", path = ".." }
+clap = { version = "4.6", features = ["derive"] }
+nlpo3 = { version = "2.0", path = ".." }

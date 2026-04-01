@@ -66,18 +66,120 @@ have been removed.
 
 ## Dictionary: FST-backed (optional)
 
-The `FstDictionary` type in `src/tokenizer/fst_dict.rs` provides a
+The `FstDict` type in `src/tokenizer/fst_dict.rs` provides a
 memory-efficient alternative to `TrieChar` for storing the word list. It uses
 the `fst` crate (finite state transducers) which stores sorted string sets in
 a minimized DFA, achieving a few bytes per entry versus tens of bytes per
 trie node.
 
-`FstDictionary` supports:
+`FstDict` supports:
 - O(k) prefix lookup via `prefix_lengths(text)` (where k = text length).
 - Dynamic add/remove operations via small delta `HashSet`s.
+
+## Rust 2024 edition patterns
+
+The codebase targets the **Rust 2024 edition** (`edition = "2024"`,
+`rust-version = "1.88.0"`) and exploits several features that edition
+stabilizes or refines.
+
+### `let` chains
+
+Complex nested `match` and `while match { true/false }` idioms are replaced
+with `let` chains, which chain pattern conditions directly in `if` and `while`
+guards:
+
+```rust
+// trie_char.rs — double-nested match → let chain
+if let Some(node) = current_node
+    && let Some(child) = node.find_child(ch)
+{
+    // …
+}
+
+// newmm.rs — while match { true / false } → while let && condition
+while let Some(&begin_position) = position_list.peek()
+    && begin_position < text_length
+{
+    // …
+}
+```
+
+### Reference patterns
+
+In the 2024 edition the ergonomics of reference patterns in `for` and
+closure contexts are refined: you can write `&T` on the left-hand side of
+a binding where the iterator yields `&T`, removing the need for an explicit
+`*deref`:
+
+```rust
+// Before (explicit deref)
+for position in idk {                 // position: &usize
+    if *position != goal { … }
+}
+
+// After (reference pattern)
+for &position in idk {                // position: usize — Copy, no deref needed
+    if position != goal { … }
+}
+
+// Tuple reference pattern in a closure
+entries.iter().filter_map(|&(s, idx)| { … })   // was |(s, idx)| { … *idx … }
+```
+
+### `Copy` types by value
+
+Small `Copy` types (such as `char`) are now passed by value rather than by
+reference, avoiding an indirection:
+
+```rust
+// trie_char.rs
+fn find_child(&self, ch: char) -> Option<&Self>        // was &char
+fn find_mut_child(&mut self, ch: char) -> Option<…>    // was &char
+fn remove_child(&mut self, ch: char)                   // was &char
+```
+
+### `entry` API and iterator chains
+
+Duplicated `match get_mut / insert` blocks are replaced with idiomatic
+`HashMap::entry` calls; manual accumulator loops are replaced with
+functional iterator chains:
+
+```rust
+// entry().or_default() replaces match + insert
+graph.entry(begin_position).or_default().push(end_position_candidate);
+
+// filter + last + map replaces a manual for loop
+text.chars()
+    .enumerate()
+    .filter(|&(_, ch)| ch == ' ')
+    .last()
+    .map(|(i, _)| i)
+```
+
+### `unsafe` in hot paths — `SAFETY` comments
+
+`fst_dict.rs` has one intentional `unsafe` block in the `prefix_lengths` hot
+loop:
+
+```rust
+// SAFETY: All keys in the FST were inserted as valid UTF-8 strings in
+// `from_words`. The FST stores raw bytes verbatim and never modifies them,
+// so every key is guaranteed to be valid UTF-8. Using the unchecked variant
+// avoids a redundant byte-scan on every iteration of this hot lookup loop.
+let word = unsafe { std::str::from_utf8_unchecked(key) };
+```
+
+The invariant is established once at construction time in `from_words()`, which
+accepts `&str` inputs (already valid UTF-8) and inserts their raw bytes into
+the FST unchanged. Using `from_utf8_unchecked` in the hot lookup loop avoids
+re-scanning the same bytes on every matching key, which would regress
+`FstDict::prefix_lengths` performance.
 
 ## References
 
 - [Rust String indexing](https://doc.rust-lang.org/book/ch08-02-strings.html#indexing-into-strings)
 - [UTF-8 on Wikipedia](https://en.wikipedia.org/wiki/UTF-8)
 - [`fst` crate documentation](https://docs.rs/fst/)
+- [Rust 2024 edition guide](https://doc.rust-lang.org/edition-guide/rust-2024/)
+- [RFC 3318 — `let` chains](https://github.com/rust-lang/rfcs/pull/3318)
+- [RFC 3627 — match ergonomics 2024](https://github.com/rust-lang/rfcs/pull/3627)

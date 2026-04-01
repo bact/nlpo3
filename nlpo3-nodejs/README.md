@@ -1,5 +1,5 @@
 ---
-SPDX-FileCopyrightText: 2024 PyThaiNLP Project
+SPDX-FileCopyrightText: 2024-2026 PyThaiNLP Project
 SPDX-License-Identifier: Apache-2.0
 ---
 
@@ -23,7 +23,7 @@ Node.js binding for nlpO3, a Thai natural language processing library in Rust.
 
 ### Requirements
 
-- [Rust 2018 Edition](https://www.rust-lang.org/tools/install)
+- [Rust 2024 Edition](https://www.rust-lang.org/tools/install)
 - Node.js v12 or newer
 
 ### Steps

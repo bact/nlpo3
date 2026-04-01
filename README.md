@@ -9,8 +9,10 @@ SPDX-License-Identifier: Apache-2.0
 [![Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg "Apache-2.0")](https://opensource.org/license/apache-2-0)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.14082448.svg)](https://doi.org/10.5281/zenodo.14082448)
 
-A Thai natural language processing library written in Rust with optional
-Python and Node.js bindings. Formerly known as `oxidized-thainlp`.
+A Thai natural language processing library written in Rust,
+featuring optional Python and Node.js bindings.
+Formerly known as `oxidized-thainlp`,
+it was originally developed by Thanathip Suntorntip.
 
 Using in a Rust project
 
@@ -87,7 +89,7 @@ This updates `Cargo.toml` with:
 
 ```toml
 [dependencies]
-nlpo3 = "1.4.0"
+nlpo3 = "2.0.0"
 ```
 
 #### Example
@@ -156,7 +158,7 @@ See more at [nlpo3-cli](./nlpo3-cli/).
 
 ### Requirements
 
-- [Rust 2018 Edition](https://www.rust-lang.org/tools/install)
+- [Rust 2024 Edition](https://www.rust-lang.org/tools/install)
 
 ### Steps
 

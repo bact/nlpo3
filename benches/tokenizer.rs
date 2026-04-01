@@ -8,7 +8,7 @@
 //! | Tokenizer | Algorithm | Dictionary | Speed | Memory |
 //! |-----------|-----------|------------|-------|--------|
 //! | [`NewmmTokenizer`] | Maximal matching + TCC | `TrieChar` | fastest | ~43 MB |
-//! | [`NewmmFstTokenizer`] | Maximal matching + TCC | `FstDictionary` | moderate | ~0.85 MB |
+//! | [`NewmmFstTokenizer`] | Maximal matching + TCC | `FstDict` | moderate | ~0.85 MB |
 //! | [`DeepcutTokenizer`] | CNN (ONNX) | bundled model | slowest | fixed |
 //!
 //! All three implement [`Tokenizer`] and are interchangeable at call sites that
@@ -18,8 +18,8 @@
 //!
 //! | Group | What is measured |
 //! |-------|-----------------|
-//! | `dict_construction` | Build time for `TrieChar` vs `FstDictionary` |
-//! | `prefix_lookup` | Per-query prefix scan: `TrieChar` vs `FstDictionary` |
+//! | `dict_construction` | Build time for `TrieChar` vs `FstDict` |
+//! | `prefix_lookup` | Per-query prefix scan: `TrieChar` vs `FstDict` |
 //! | `full_tokenization` | End-to-end segment() for all three tokenizers |
 //! | `memory_footprint` | Heap-size estimates printed to stderr |
 //!
@@ -33,11 +33,12 @@
 //! ```
 //! HTML reports land in `target/criterion/`.
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use std::hint::black_box;
 use nlpo3::{
     char_string::CharString,
     tokenizer::{
-        fst_dict::FstDictionary,
+        fst_dict::FstDict,
         newmm::{NewmmFstTokenizer, NewmmTokenizer},
         trie_char::TrieChar,
         tokenizer_trait::Tokenizer,
@@ -90,7 +91,7 @@ fn load_word_list() -> Vec<String> {
 }
 
 // ===========================================================================
-// 1. Dictionary construction — TrieChar vs FstDictionary
+// 1. Dictionary construction — TrieChar vs FstDict
 // ===========================================================================
 
 fn bench_dict_construction(c: &mut Criterion) {
@@ -105,9 +106,9 @@ fn bench_dict_construction(c: &mut Criterion) {
         b.iter(|| black_box(TrieChar::new(black_box(&char_words))))
     });
 
-    group.bench_function("FstDictionary::from_words", |b| {
+    group.bench_function("FstDict::from_words", |b| {
         b.iter(|| {
-            black_box(FstDictionary::from_words(black_box(word_strs.iter().copied())).unwrap())
+            black_box(FstDict::from_words(black_box(word_strs.iter().copied())).unwrap())
         })
     });
 
@@ -115,14 +116,14 @@ fn bench_dict_construction(c: &mut Criterion) {
 }
 
 // ===========================================================================
-// 2. Dictionary prefix lookup — TrieChar vs FstDictionary
+// 2. Dictionary prefix lookup — TrieChar vs FstDict
 // ===========================================================================
 
 fn bench_prefix_lookup(c: &mut Criterion) {
     let word_list = load_word_list();
     let char_words: Vec<CharString> = word_list.iter().map(|w| CharString::new(w)).collect();
     let trie = TrieChar::new(&char_words);
-    let fst_dict = FstDictionary::from_words(word_list.iter().map(|s| s.as_str())).unwrap();
+    let fst_dict = FstDict::from_words(word_list.iter().map(|s| s.as_str())).unwrap();
 
     let mut group = c.benchmark_group("prefix_lookup");
 
@@ -140,7 +141,7 @@ fn bench_prefix_lookup(c: &mut Criterion) {
         );
 
         group.bench_with_input(
-            BenchmarkId::new("FstDictionary::prefix_lengths", label),
+            BenchmarkId::new("FstDict::prefix_lengths", label),
             text,
             |b, t| b.iter(|| black_box(fst_dict.prefix_lengths(black_box(t)))),
         );
@@ -152,7 +153,7 @@ fn bench_prefix_lookup(c: &mut Criterion) {
 // 3. End-to-end tokenization — all three tokenizers
 //
 // NewmmTokenizer    = CharString + TrieChar        (fastest, ~43 MB dict)
-// NewmmFstTokenizer = CharString + FstDictionary   (moderate, ~0.85 MB dict)
+// NewmmFstTokenizer = CharString + FstDict   (moderate, ~0.85 MB dict)
 // DeepcutTokenizer  = CNN/ONNX                     (requires --features deepcut)
 // ===========================================================================
 
@@ -186,7 +187,7 @@ fn bench_full_tokenization(c: &mut Criterion) {
             |b, t| b.iter(|| black_box(tok_trie.segment(black_box(t), true, false).unwrap())),
         );
 
-        // NewmmFstTokenizer — CharString + FstDictionary (memory-efficient)
+        // NewmmFstTokenizer — CharString + FstDict (memory-efficient)
         group.bench_with_input(
             BenchmarkId::new("NewmmFstTokenizer/safe=false", label),
             text,
@@ -222,7 +223,7 @@ fn bench_memory_footprint(c: &mut Criterion) {
 
     let word_list = load_word_list();
     let n_words = word_list.len();
-    let fst_dict = FstDictionary::from_words(word_list.iter().map(|s| s.as_str())).unwrap();
+    let fst_dict = FstDict::from_words(word_list.iter().map(|s| s.as_str())).unwrap();
 
     eprintln!("\n╔══════════════════════════════════════════════════════╗");
     eprintln!("║          Memory footprint analysis                   ║");
@@ -264,7 +265,7 @@ fn bench_memory_footprint(c: &mut Criterion) {
 
     eprintln!("\nDictionary ({} words):", n_words);
     eprintln!(
-        "  FstDictionary base FST:    {:>8} bytes  ({:.1} bytes/word)",
+        "  FstDict base FST:    {:>8} bytes  ({:.1} bytes/word)",
         fst_bytes,
         fst_bytes as f64 / n_words as f64
     );
@@ -274,7 +275,7 @@ fn bench_memory_footprint(c: &mut Criterion) {
         trie_estimate as f64 / n_words as f64
     );
     eprintln!(
-        "  → FstDictionary is ~{:.0}× smaller than TrieChar",
+        "  → FstDict is ~{:.0}× smaller than TrieChar",
         trie_estimate as f64 / fst_bytes as f64
     );
 

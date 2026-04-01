@@ -150,13 +150,11 @@ impl fmt::Display for CharString {
 /// Find the last space character and return its character index within the
 /// provided `&str`. Returns `None` if no space is found.
 pub fn rfind_space_char_index(text: &str) -> Option<usize> {
-    let mut last_space: Option<usize> = None;
-    for (char_idx, ch) in text.chars().enumerate() {
-        if ch == ' ' {
-            last_space = Some(char_idx);
-        }
-    }
-    last_space
+    text.chars()
+        .enumerate()
+        .filter(|&(_, ch)| ch == ' ')
+        .last()
+        .map(|(i, _)| i)
 }
 
 // ---------------------------------------------------------------------------

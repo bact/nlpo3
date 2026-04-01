@@ -1,6 +1,6 @@
 {
   "name": "nlpo3-nodejs",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Node.js binding for nlpO3 Thai language processing library",
   "repository": {
     "type": "git",
@@ -9,9 +9,13 @@
   "keywords": [
     "thai",
     "tokenizer",
+    "tokenization",
+    "text-processing",
     "nlp",
+    "natural-language-processing",
+    "word-segmentation",
+    "pythainlp",
     "rust",
-    "word-segmentation"
   ],
   "author": {
     "name": "Thanathip Suntorntip Gorlph",
@@ -19,7 +23,7 @@
   },
   "contributors": [
     {
-      "name": "Arthit Suriiyawongkul",
+      "name": "Arthit Suriyawongkul",
       "url": "https://github.com/bact"
     }
   ],
