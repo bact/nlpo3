@@ -22,13 +22,13 @@ pub fn create_dict_trie(source: DictSource) -> Result<Trie> {
     match source {
         DictSource::FilePath(file_path) => {
             let file = File::open(file_path.as_path())
-                .map_err(|e| anyhow::anyhow!("failed to open dictionary: {}", e))?;
+                .map_err(|e| anyhow::anyhow!("failed to open dictionary {:?}: {}", file_path, e))?;
             let mut reader = BufReader::new(file);
             let mut line = String::with_capacity(50);
             let mut dict: Vec<CharString> = Vec::with_capacity(600);
             while reader
                 .read_line(&mut line)
-                .map_err(|e| anyhow::anyhow!("failed to read dictionary: {}", e))?
+                .map_err(|e| anyhow::anyhow!("failed to read dictionary {:?}: {}", file_path, e))?
                 != 0
             {
                 dict.push(CharString::new(&line));

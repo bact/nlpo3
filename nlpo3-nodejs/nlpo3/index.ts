@@ -45,7 +45,7 @@ export interface SegmentOptions {
  *
  * @example
  * ```typescript
- * import { NewmmTokenizer } from "nlpo3";
+ * import { NewmmTokenizer } from "nlpo3-nodejs";
  *
  * const tok = new NewmmTokenizer("/path/to/dict.txt");
  *
@@ -92,7 +92,7 @@ export class NewmmTokenizer {
  *
  * @example
  * ```typescript
- * import { NewmmFstTokenizer } from "nlpo3";
+ * import { NewmmFstTokenizer } from "nlpo3-nodejs";
  *
  * const tok = new NewmmFstTokenizer("/path/to/dict.txt");
  * const tokens = tok.segment("สวัสดีครับ");
@@ -137,7 +137,7 @@ export class NewmmFstTokenizer {
  *
  * @example
  * ```typescript
- * import { DeepcutTokenizer } from "nlpo3";
+ * import { DeepcutTokenizer } from "nlpo3-nodejs";
  *
  * const tok = new DeepcutTokenizer();
  * const tokens = tok.segment("สวัสดีครับ");

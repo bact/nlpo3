@@ -59,6 +59,9 @@ class NewmmTokenizer:
 
         Returns:
             List of word tokens.
+
+        Raises:
+            RuntimeError: If tokenization fails.
         """
         ...
 
@@ -109,6 +112,9 @@ class NewmmFstTokenizer:
 
         Returns:
             List of word tokens.
+
+        Raises:
+            RuntimeError: If tokenization fails.
         """
         ...
 

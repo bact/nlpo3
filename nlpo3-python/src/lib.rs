@@ -77,12 +77,19 @@ impl PyNewmmTokenizer {
     ///
     /// Returns:
     ///     List of word tokens.
+    ///
+    /// Raises:
+    ///     RuntimeError: If tokenization fails.
     #[pyo3(signature = (text, safe = false, parallel = false))]
-    fn segment(&self, text: &str, safe: bool, parallel: bool) -> Vec<String> {
+    fn segment(&self, text: &str, safe: bool, parallel: bool) -> PyResult<Vec<String>> {
         if text.is_empty() {
-            return vec![];
+            return Ok(vec![]);
         }
-        self.inner.segment_to_string(text, safe, parallel)
+        self.inner
+            .segment(text, safe, parallel)
+            .map_err(|e| {
+                exceptions::PyRuntimeError::new_err(format!("segmentation failed: {}", e))
+            })
     }
 }
 
@@ -140,12 +147,19 @@ impl PyNewmmFstTokenizer {
     ///
     /// Returns:
     ///     List of word tokens.
+    ///
+    /// Raises:
+    ///     RuntimeError: If tokenization fails.
     #[pyo3(signature = (text, safe = false, parallel = false))]
-    fn segment(&self, text: &str, safe: bool, parallel: bool) -> Vec<String> {
+    fn segment(&self, text: &str, safe: bool, parallel: bool) -> PyResult<Vec<String>> {
         if text.is_empty() {
-            return vec![];
+            return Ok(vec![]);
         }
-        self.inner.segment_to_string(text, safe, parallel)
+        self.inner
+            .segment(text, safe, parallel)
+            .map_err(|e| {
+                exceptions::PyRuntimeError::new_err(format!("tokenization failed: {}", e))
+            })
     }
 }
 

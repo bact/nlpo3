@@ -94,11 +94,17 @@ fn tokenizer_segment(mut cx: FunctionContext) -> JsResult<JsArray> {
     let safe = cx.argument::<JsBoolean>(2)?.value(&mut cx);
     let parallel = cx.argument::<JsBoolean>(3)?.value(&mut cx);
 
-    let result = wrapper.inner.segment_to_string(&text, safe, parallel);
-    let js_array = JsArray::new(&mut cx, result.len());
-    for (i, s) in result.iter().enumerate() {
+    let segments = match wrapper.inner.segment(&text, safe, parallel) {
+        Ok(tokens) => tokens,
+        Err(e) => {
+            return cx.throw_error(format!("tokenizer: failed to segment input: {}", e));
+        }
+    };
+
+    let js_array = JsArray::new(&mut cx, segments.len());
+    for (i, s) in segments.iter().enumerate() {
         let js_str = cx.string(s);
-        js_array.set(&mut cx, i as u32, js_str).unwrap();
+        js_array.set(&mut cx, i as u32, js_str)?;
     }
     Ok(js_array)
 }
