@@ -35,16 +35,16 @@ impl TrieNode {
         }
     }
 
-    fn find_child(&self, ch: &char) -> Option<&Self> {
-        self.children.get(ch)
+    fn find_child(&self, ch: char) -> Option<&Self> {
+        self.children.get(&ch)
     }
 
-    fn find_mut_child(&mut self, ch: &char) -> Option<&mut Self> {
-        self.children.get_mut(ch)
+    fn find_mut_child(&mut self, ch: char) -> Option<&mut Self> {
+        self.children.get_mut(&ch)
     }
 
-    fn remove_child(&mut self, ch: &char) {
-        self.children.remove(ch);
+    fn remove_child(&mut self, ch: char) {
+        self.children.remove(&ch);
     }
 
     fn set_not_end(&mut self) {
@@ -67,14 +67,14 @@ impl TrieNode {
             return;
         }
         let ch = chars[0];
-        if let Some(child) = self.find_mut_child(&ch) {
+        if let Some(child) = self.find_mut_child(ch) {
             if chars.len() == 1 {
                 child.set_not_end();
             } else {
                 child.remove_word(&chars[1..]);
             }
             if !child.end && child.children.is_empty() {
-                self.remove_child(&ch);
+                self.remove_child(ch);
             }
         }
     }
@@ -99,7 +99,7 @@ impl TrieChar {
             words: HashSet::default(),
             root: TrieNode::new(),
         };
-        for word in words.iter() {
+        for word in words {
             instance.add(word);
         }
         instance
@@ -154,17 +154,15 @@ impl TrieChar {
 
         for i in 0..n {
             let ch = prefix.get_char_at(i);
-            match current_node {
-                Some(node) => match node.find_child(&ch) {
-                    Some(child) => {
-                        if child.end {
-                            result.push(i + 1); // word of length i+1 chars
-                        }
-                        current_node = Some(child);
-                    }
-                    None => break,
-                },
-                None => break,
+            if let Some(node) = current_node
+                && let Some(child) = node.find_child(ch)
+            {
+                if child.end {
+                    result.push(i + 1); // word of length i+1 chars
+                }
+                current_node = Some(child);
+            } else {
+                break;
             }
         }
         result

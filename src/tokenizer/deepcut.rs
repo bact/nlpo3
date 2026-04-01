@@ -236,12 +236,12 @@ fn build_chars_map() -> HashMap<char, u32> {
     ];
     entries
         .iter()
-        .filter_map(|(s, idx)| {
+        .filter_map(|&(s, idx)| {
             let mut chars = s.chars();
             let ch = chars.next()?;
             // Keep only single-character keys.
             if chars.next().is_none() {
-                Some((ch, *idx))
+                Some((ch, idx))
             } else {
                 None
             }
@@ -296,9 +296,9 @@ fn build_char_type_map() -> HashMap<char, u32> {
         ("ABCDEFGHIJKLMNOPQRSTUVWXYZ", 0),
     ];
     let mut map = HashMap::new();
-    for (group, type_idx) in type_groups {
+    for &(group, type_idx) in type_groups {
         for ch in group.chars() {
-            map.insert(ch, *type_idx);
+            map.insert(ch, type_idx);
         }
     }
     map

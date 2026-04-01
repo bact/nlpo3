@@ -223,8 +223,7 @@ impl FstDictionary {
         let automaton = PrefixOf::new(text);
         let mut stream = self.base.search(&automaton).into_stream();
         while let Some(key) = stream.next() {
-            // SAFETY: FST was built from valid UTF-8.
-            let word = unsafe { std::str::from_utf8_unchecked(key) };
+            let word = std::str::from_utf8(key).expect("FST keys are valid UTF-8");
             if !self.removals.contains(word) {
                 let len = word.chars().count();
                 if seen.insert(len) {
