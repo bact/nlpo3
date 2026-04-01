@@ -81,7 +81,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 None => Box::new(NewmmTokenizer::from_word_list(
                     DEFAULT_DICT.lines().map(|s| s.to_owned()).collect(),
                 )),
-                Some(path) => Box::new(NewmmTokenizer::new(path)),
+                Some(path) => Box::new(NewmmTokenizer::new(path)?),
             }
         }
         TokenizerKind::Nf => {
@@ -92,8 +92,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             match dict_path {
                 None => Box::new(NewmmFstTokenizer::from_word_list(
                     DEFAULT_DICT.lines().map(|s| s.to_owned()).collect(),
-                )),
-                Some(path) => Box::new(NewmmFstTokenizer::new(path)),
+                )?),
+                Some(path) => Box::new(NewmmFstTokenizer::new(path)?),
             }
         }
         #[cfg(feature = "deepcut")]

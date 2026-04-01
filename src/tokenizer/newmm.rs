@@ -14,16 +14,16 @@
  * Original Rust implementation: Thanathip Suntorntip
  * Rewrite using native Rust Unicode types: PyThaiNLP Project
  */
-use std::{collections::VecDeque, error::Error, fmt::Display, path::PathBuf};
+use std::{collections::VecDeque, error::Error, fmt::Display, path::PathBuf, sync::Arc};
 
 use super::{
     dict_backend::DictBackend,
-    dict_reader::{create_dict_fst, create_dict_trie, DictSource},
+    dict_reader::{DictSource, create_dict_fst, create_dict_trie},
     tcc::tcc_tokenizer,
     tokenizer_trait::Tokenizer,
     trie_char::TrieChar,
 };
-use crate::char_string::{rfind_space_char_index, CharString};
+use crate::char_string::{CharString, rfind_space_char_index};
 
 use anyhow::Result as AnyResult;
 use binary_heap_plus::{BinaryHeap, MinComparator};
@@ -54,10 +54,8 @@ const NON_THAI_READABLE_PATTERN: &[&str; 5] = &[
 ];
 
 lazy_static! {
-    static ref NON_THAI_PATTERN: Regex =
-        Regex::new(&NON_THAI_READABLE_PATTERN.join("|")).unwrap();
-    static ref THAI_TWOCHARS_PATTERN: Regex =
-        Regex::new(r"^[ก-ฮ]{0,2}$").unwrap();
+    static ref NON_THAI_PATTERN: Regex = Regex::new(&NON_THAI_READABLE_PATTERN.join("|")).unwrap();
+    static ref THAI_TWOCHARS_PATTERN: Regex = Regex::new(r"^[ก-ฮ]{0,2}$").unwrap();
 }
 
 #[derive(Clone, Debug)]
@@ -99,6 +97,12 @@ impl Error for BFSSearchError {}
 /// prefix lookup.  This is the **default and fastest** combination for
 /// end-to-end tokenization.
 ///
+/// The dictionary is stored behind an [`Arc`], so **cloning a tokenizer is
+/// O(1)** — no dictionary data is copied.  Multiple instances created from the
+/// same word list share the dictionary in memory automatically.  Because all
+/// `segment` calls take `&self`, the same instance (or a cheaply cloned copy)
+/// is safe to call from multiple threads concurrently.
+///
 /// To use a more memory-efficient dictionary backend, see [`NewmmFstTokenizer`].
 ///
 /// All dictionary-based tokenizers implement the shared [`Tokenizer`] trait,
@@ -109,14 +113,14 @@ impl Error for BFSSearchError {}
 /// use nlpo3::tokenizer::tokenizer_trait::Tokenizer;
 ///
 /// // Maximum speed (CharString + TrieChar):
-/// let tok: Box<dyn Tokenizer> = Box::new(NewmmTokenizer::new("words_th.txt"));
+/// let tok: Box<dyn Tokenizer> = Box::new(NewmmTokenizer::new("words_th.txt").unwrap());
 ///
 /// // Compact memory (CharString + FstDict):
-/// let tok: Box<dyn Tokenizer> = Box::new(NewmmFstTokenizer::new("words_th.txt"));
+/// let tok: Box<dyn Tokenizer> = Box::new(NewmmFstTokenizer::new("words_th.txt").unwrap());
 /// ```
 #[derive(Debug)]
 pub struct NewmmTokenizer<D: DictBackend = TrieChar> {
-    dict: Box<D>,
+    dict: Arc<D>,
 }
 
 /// Memory-efficient dictionary-based tokenizer (CharString + FstDict).
@@ -125,6 +129,8 @@ pub struct NewmmTokenizer<D: DictBackend = TrieChar> {
 /// algorithm as [`NewmmTokenizer`], but stores the dictionary in a minimized
 /// finite-state automaton ([`FstDict`]).  This reduces dictionary memory
 /// by ~49× at the cost of slower per-lookup speed.
+///
+/// Like [`NewmmTokenizer`], cloning is O(1) (Arc ref-count increment).
 ///
 /// Implements the same [`Tokenizer`] trait as [`NewmmTokenizer`] and
 /// `DeepcutTokenizer`, so tokenizers are interchangeable at any call site
@@ -136,51 +142,90 @@ pub struct NewmmFstTokenizer {
     inner: NewmmTokenizer<super::fst_dict::FstDict>,
 }
 
-impl NewmmTokenizer<TrieChar> {
-    /// Create a tokenizer from a dictionary file (TrieChar backend).
-    pub fn new(dict_path: &str) -> Self {
+// ---------------------------------------------------------------------------
+// Clone implementations — O(1) Arc ref-count increment, no dict copy
+// ---------------------------------------------------------------------------
+
+impl<D: DictBackend> Clone for NewmmTokenizer<D> {
+    fn clone(&self) -> Self {
         NewmmTokenizer {
-            dict: Box::from(
-                create_dict_trie(DictSource::FilePath(PathBuf::from(dict_path))).unwrap(),
-            ),
+            dict: Arc::clone(&self.dict),
         }
     }
+}
 
-    /// Create a tokenizer from a word list (TrieChar backend).
+impl Clone for NewmmFstTokenizer {
+    fn clone(&self) -> Self {
+        NewmmFstTokenizer {
+            inner: self.inner.clone(),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Constructors
+// ---------------------------------------------------------------------------
+
+impl NewmmTokenizer<TrieChar> {
+    /// Create a tokenizer by loading a dictionary file (TrieChar backend).
+    ///
+    /// Returns an error if the file cannot be read or parsed.
+    pub fn new(dict_path: &str) -> AnyResult<Self> {
+        Ok(NewmmTokenizer {
+            dict: Arc::new(create_dict_trie(DictSource::FilePath(PathBuf::from(
+                dict_path,
+            )))?),
+        })
+    }
+
+    /// Create a tokenizer from an in-memory word list (TrieChar backend).
+    ///
+    /// Construction from a word list is infallible.
     pub fn from_word_list(word_list: Vec<String>) -> Self {
         NewmmTokenizer {
-            dict: Box::from(create_dict_trie(DictSource::WordList(word_list)).unwrap()),
+            dict: Arc::new(create_dict_trie(DictSource::WordList(word_list)).unwrap()),
         }
     }
 }
 
 impl NewmmFstTokenizer {
-    /// Create a tokenizer from a dictionary file (FstDict backend).
-    pub fn new(dict_path: &str) -> Self {
-        Self {
+    /// Create a tokenizer by loading a dictionary file (FstDict backend).
+    ///
+    /// Returns an error if the file cannot be read or parsed.
+    pub fn new(dict_path: &str) -> AnyResult<Self> {
+        Ok(Self {
             inner: NewmmTokenizer {
-                dict: Box::from(
-                    create_dict_fst(DictSource::FilePath(PathBuf::from(dict_path))).unwrap(),
-                ),
+                dict: Arc::new(create_dict_fst(DictSource::FilePath(PathBuf::from(
+                    dict_path,
+                )))?),
             },
-        }
+        })
     }
 
-    /// Create a tokenizer from a word list (FstDict backend).
-    pub fn from_word_list(word_list: Vec<String>) -> Self {
-        Self {
+    /// Create a tokenizer from an in-memory word list (FstDict backend).
+    ///
+    /// Returns an error if the word list cannot be turned into an FST
+    /// (for example, if duplicate normalization fails internally).
+    pub fn from_word_list(word_list: Vec<String>) -> AnyResult<Self> {
+        Ok(Self {
             inner: NewmmTokenizer {
-                dict: Box::from(create_dict_fst(DictSource::WordList(word_list)).unwrap()),
+                dict: Arc::new(create_dict_fst(DictSource::WordList(word_list))?),
             },
-        }
+        })
     }
 
     /// Add words to the tokenizer's dictionary.
+    ///
+    /// If other clones share the same `Arc`, the dictionary is copied
+    /// before mutation (copy-on-write); all other clones are unaffected.
     pub fn add_word(&mut self, word_list: &[&str]) {
         self.inner.add_word(word_list);
     }
 
     /// Remove words from the tokenizer's dictionary.
+    ///
+    /// If other clones share the same `Arc`, the dictionary is copied
+    /// before mutation (copy-on-write); all other clones are unaffected.
     pub fn remove_word(&mut self, word_list: &[&str]) {
         self.inner.remove_word(word_list);
     }
@@ -198,16 +243,30 @@ impl Tokenizer for NewmmFstTokenizer {
 
 impl<D: DictBackend> NewmmTokenizer<D> {
     /// Add words to the tokenizer's dictionary.
-    pub fn add_word(&mut self, word_list: &[&str]) {
+    ///
+    /// If other clones share the same `Arc`, the dictionary is copied
+    /// before mutation (copy-on-write); all other clones are unaffected.
+    pub fn add_word(&mut self, word_list: &[&str])
+    where
+        D: Clone,
+    {
+        let dict = Arc::make_mut(&mut self.dict);
         for word in word_list {
-            self.dict.add_word(&CharString::new(word));
+            dict.add_word(&CharString::new(word));
         }
     }
 
     /// Remove words from the tokenizer's dictionary.
-    pub fn remove_word(&mut self, word_list: &[&str]) {
+    ///
+    /// If other clones share the same `Arc`, the dictionary is copied
+    /// before mutation (copy-on-write); all other clones are unaffected.
+    pub fn remove_word(&mut self, word_list: &[&str])
+    where
+        D: Clone,
+    {
+        let dict = Arc::make_mut(&mut self.dict);
         for word in word_list {
-            self.dict.remove_word(&CharString::new(word));
+            dict.remove_word(&CharString::new(word));
         }
     }
 
@@ -242,10 +301,7 @@ impl<D: DictBackend> NewmmTokenizer<D> {
         Err(BFSSearchError::new(graph, start, goal).into())
     }
 
-    fn one_cut<'a>(
-        input: &'a CharString,
-        custom_dict: &D,
-    ) -> AnyResult<Vec<&'a str>> {
+    fn one_cut<'a>(input: &'a CharString, custom_dict: &D) -> AnyResult<Vec<&'a str>> {
         let text = input;
         let input_char_len = text.chars_len();
         let mut reused_queue: VecDeque<(usize, Vec<usize>)> = VecDeque::with_capacity(10);
@@ -314,8 +370,7 @@ impl<D: DictBackend> NewmmTokenizer<D> {
                 match NON_THAI_PATTERN.find(sub_str) {
                     // Non-Thai text: skip to end of match.
                     Some(match_point) => {
-                        let matched_char_count =
-                            sub_str[..match_point.end()].chars().count();
+                        let matched_char_count = sub_str[..match_point.end()].chars().count();
                         end_position = begin_position + matched_char_count;
                     }
                     // Thai text with no dictionary match: find minimum skip.
@@ -325,14 +380,12 @@ impl<D: DictBackend> NewmmTokenizer<D> {
                             if valid_position.contains(&position) {
                                 let prefix = text.substring(position, text_length);
 
-                                let list_of_prefixes =
-                                    custom_dict.prefix_lengths_of(&prefix);
+                                let list_of_prefixes = custom_dict.prefix_lengths_of(&prefix);
                                 let valid_word_filter = |word_length: &usize| {
                                     let new_position = position + word_length;
-                                    let is_valid =
-                                        valid_position.contains(&new_position);
-                                    let word_str = text
-                                        .substring_as_str(position, position + word_length);
+                                    let is_valid = valid_position.contains(&new_position);
+                                    let word_str =
+                                        text.substring_as_str(position, position + word_length);
                                     let is_two_thai_chars =
                                         THAI_TWOCHARS_PATTERN.is_match(word_str);
                                     is_valid && !is_two_thai_chars
@@ -394,10 +447,7 @@ impl<D: DictBackend> NewmmTokenizer<D> {
         if !safe || input.chars_len() < TEXT_SCAN_END {
             let result = Self::one_cut(input, custom_dict)?;
             Ok(if parallel {
-                result
-                    .into_par_iter()
-                    .map(|s| s.to_string())
-                    .collect()
+                result.into_par_iter().map(|s| s.to_string()).collect()
             } else {
                 result.into_iter().map(|s| s.to_string()).collect()
             })
@@ -467,7 +517,7 @@ impl<D: DictBackend> NewmmTokenizer<D> {
 
 impl<D: DictBackend> Tokenizer for NewmmTokenizer<D> {
     fn segment(&self, text: &str, safe: bool, parallel: bool) -> AnyResult<Vec<String>> {
-        Self::internal_segment(&CharString::new(text), &self.dict, safe, parallel)
+        Self::internal_segment(&CharString::new(text), &*self.dict, safe, parallel)
     }
 
     fn segment_to_string(&self, text: &str, safe: bool, parallel: bool) -> Vec<String> {

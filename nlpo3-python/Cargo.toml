@@ -41,8 +41,6 @@ path = "src/lib.rs"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-ahash = "0.8"
-lazy_static = "1.5"
 nlpo3 = { version = "2.0", path = "..", features = ["deepcut"] }
 
 [dependencies.pyo3]

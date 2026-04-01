@@ -24,7 +24,15 @@ nlpo3 --help
 nlpo3 segment --help
 ```
 
-## Example
+## Tokenizers
+
+| Tokenizer | Flag | Description |
+|-----------|------|-------------|
+| `newmm` | *(default)* | Dictionary-based maximal-matching (TrieChar backend, fastest) |
+| `nf` | `--tokenizer nf` | Same algorithm with FST backend (~49× less memory) |
+| `deepcut` | `--tokenizer deepcut` | Neural CNN model (no dictionary needed) |
+
+## Examples
 
 Tokenize from standard input using the built-in dictionary:
 
@@ -32,10 +40,24 @@ Tokenize from standard input using the built-in dictionary:
 echo "ฉันกินข้าว" | nlpo3 segment
 ```
 
-Tokenize using a custom dictionary file:
+Select a tokenizer:
+
+```bash
+# FST backend (less memory)
+echo "ฉันกินข้าว" | nlpo3 segment --tokenizer nf
+
+# Short form
+echo "ฉันกินข้าว" | nlpo3 segment -t nf
+
+# Neural CNN tokenizer (no dictionary needed)
+echo "ฉันกินข้าว" | nlpo3 segment --tokenizer deepcut
+```
+
+Use a custom dictionary file:
 
 ```bash
 echo "ฉันกินข้าว" | nlpo3 segment --dict-path /path/to/dict.txt
+echo "ฉันกินข้าว" | nlpo3 segment -t nf --dict-path /path/to/dict.txt
 ```
 
 Use a custom word delimiter:
@@ -48,6 +70,12 @@ Enable safe mode (avoids long run times on ambiguous input):
 
 ```bash
 echo "ฉันกินข้าว" | nlpo3 segment --safe
+```
+
+Enable parallel processing:
+
+```bash
+echo "ฉันกินข้าว" | nlpo3 segment --parallel
 ```
 
 ## License

@@ -2,43 +2,61 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /**
- * Load a dictionary file and register it under `dictName`.
+ * Opaque handle to a Rust tokenizer instance.
  *
- * @param filePath  Absolute path to a one-word-per-line dictionary file.
- * @param dictName  Registry key used to reference the tokenizer later.
- * @param tokenizer Tokenizer backend: `"newmm"` (default) or `"nf"`.
- * @returns         A result string starting with `"ok:"` on success or
- *                  `"error:"` on failure.
+ * Returned by the constructor functions below and consumed by
+ * {@link tokenizerSegment}.  Because the underlying tokenizer is read-only
+ * after construction, the same handle may be passed to {@link tokenizerSegment}
+ * any number of times — the dictionary is never reloaded or copied.
  */
-export function loadDict(
-    filePath: string,
-    dictName: string,
-    tokenizer?: "newmm" | "nf",
-): string;
+export interface TokenizerHandle {
+    readonly __type: unique symbol;
+}
 
 /**
- * Tokenize `text` using the tokenizer registered under `dictName`.
+ * Create a NewmmTokenizer backed by a TrieChar dictionary.
  *
+ * @param dictPath  Path to a one-word-per-line dictionary file.
+ */
+export function newmmTokenizerNew(dictPath: string): TokenizerHandle;
+
+/**
+ * Create a NewmmFstTokenizer backed by a finite-state automaton dictionary.
+ *
+ * Uses ~49× less memory than {@link newmmTokenizerNew} at the cost of slower
+ * per-lookup speed.
+ *
+ * @param dictPath  Path to a one-word-per-line dictionary file.
+ */
+export function newmmFstTokenizerNew(dictPath: string): TokenizerHandle;
+
+/**
+ * Create a DeepcutTokenizer using the bundled ONNX model.
+ *
+ * The model is compiled on construction.  Internally the model is
+ * reference-counted, so cloning the handle is O(1).
+ *
+ * @throws Error if the ONNX model cannot be loaded.
+ */
+export function deepcutTokenizerNew(): TokenizerHandle;
+
+/**
+ * Tokenize `text` using a previously created tokenizer handle.
+ *
+ * The tokenizer is read-only — reusing the same handle for every call is both
+ * safe and efficient (the dictionary is loaded only once).
+ *
+ * @param handle    Handle returned by one of the constructor functions.
  * @param text      Input text to tokenize.
- * @param dictName  Registry key of a previously loaded dictionary tokenizer.
  * @param safe      Enable safe mode (avoids long run times on ambiguous input).
+ *                  Ignored by DeepcutTokenizer.
  * @param parallel  Enable parallel processing (uses more memory).
+ *                  Ignored by DeepcutTokenizer.
  * @returns         Array of word tokens.
  */
-export function segment(
+export function tokenizerSegment(
+    handle: TokenizerHandle,
     text: string,
-    dictName: string,
     safe: boolean,
     parallel: boolean,
 ): string[];
-
-/**
- * Tokenize `text` using the deepcut neural CNN model.
- *
- * No dictionary is required. The model is bundled with the package.
- * The model is loaded on first call and reused for subsequent calls.
- *
- * @param text  Input text to tokenize.
- * @returns     Array of word tokens.
- */
-export function segmentDeepcut(text: string): string[];

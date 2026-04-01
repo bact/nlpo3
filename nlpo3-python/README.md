@@ -31,106 +31,102 @@ pip install nlpo3
 
 ## Features
 
-- Dictionary-based word tokenizer
-  - `segment()` — maximal-matching dictionary-based tokenization
-    that honors [Thai Character Cluster][tcc] boundaries
-    - [2.5x faster][benchmark]
-      than similar pure Python implementation (PyThaiNLP's newmm)
-  - `load_dict()` — load a dictionary from a plain text file
-    (one word per line)
-- ML-based word tokenizer
-  - `segment_deepcut()` — CNN-based tokenization using the
-    [deepcut][deepcut] model
-  - `DeepcutTokenizer` — class-based access to the Deepcut model;
-    supports custom ONNX model paths and is safe to share across threads
+Three interchangeable Thai word tokenizers:
 
-[tcc]: https://dl.acm.org/doi/10.1145/355214.355225
+- `NewmmTokenizer` — dictionary-based maximal-matching (TrieChar backend,
+  fastest, ~43 MB for 62k words). [2.5× faster][benchmark] than PyThaiNLP's newmm.
+- `NewmmFstTokenizer` — same algorithm with FST backend (~49× less memory)
+- `DeepcutTokenizer` — neural CNN model (no dictionary needed).
+  Based on [deepcut][deepcut] via [LEKCut][lekcut].
+
+All three implement the same `segment()` interface and are interchangeable.
+Each instance is **read-only after construction** and safe to reuse across
+many concurrent calls or Python threads.
+
 [benchmark]: ./notebooks/nlpo3_segment_benchmarks.ipynb
 [deepcut]: https://github.com/rkcosmos/deepcut
+[lekcut]: https://github.com/PyThaiNLP/LEKCut
 
 ## Use
 
-### Dictionary-based tokenizer
-
-Load a dictionary file and assign it a name (for example, `dict_name`).
-
-Then tokenize text using the named dictionary:
+### Dictionary-based tokenizer (newmm, TrieChar backend)
 
 ```python
-from nlpo3 import load_dict, segment
+from nlpo3 import NewmmTokenizer
 
-load_dict("path/to/dict.file", "dict_name")
-segment("สวัสดีครับ", "dict_name")
+# Create once — the dictionary is loaded only once.
+# Reuse the same instance for every call; no dictionary copying occurs.
+tok = NewmmTokenizer("path/to/dict.txt")
+
+# Basic tokenization
+tok.segment("สวัสดีครับ")
+# => ["สวัสดี", "ครับ"]
+
+# Safe mode — avoids long run times on ambiguous input
+tok.segment("สวัสดีครับ", safe=True)
+
+# Parallel mode — multi-threaded processing (higher memory use)
+tok.segment("สวัสดีครับ", parallel=True)
 ```
 
-The function returns a list of strings, for example:
+### Dictionary-based tokenizer (nf, FST backend)
+
+Same API as `NewmmTokenizer`, but uses ~49× less memory:
 
 ```python
-['สวัสดี', 'ครับ']
+from nlpo3 import NewmmFstTokenizer
+
+tok = NewmmFstTokenizer("path/to/dict.txt")
+tok.segment("สวัสดีครับ")
 ```
 
-The result depends on the words included in the dictionary.
-
-Use multithread mode using the `dict_name` dictionary:
-
-```python
-segment("สวัสดีครับ", dict_name="dict_name", parallel=True)
-```
-
-Use safe mode to avoid long run times for inputs with many ambiguous
-word boundaries:
-
-```python
-segment("สวัสดีครับ", dict_name="dict_name", safe=True)
-```
-
-### Deepcut tokenizer
-
-Tokenize text using the bundled Deepcut model.
-
-```python
-from nlpo3 import segment_deepcut
-
-segment_deepcut("สวัสดีครับ")
-```
-
-The function returns a list of strings, for example:
-
-```python
-['สวัสดี', 'ครับ']
-```
-
-Use the `DeepcutTokenizer` class to load a custom ONNX model or to reuse
-a single model instance across multiple calls (the same instance is safe
-to call from multiple threads):
+### Neural tokenizer (deepcut)
 
 ```python
 from nlpo3 import DeepcutTokenizer
 
-# Use the bundled default model
-tokenizer = DeepcutTokenizer()
-tokenizer.segment("สวัสดีครับ")
+# No dictionary needed. The model is compiled once and cached in the instance.
+tok = DeepcutTokenizer()
+tok.segment("สวัสดีครับ")
+# => ["สวัสดี", "ครับ"]
 
-# Use a custom model file
-tokenizer = DeepcutTokenizer(model_path="/path/to/custom.onnx")
-tokenizer.segment("สวัสดีครับ")
+# Custom ONNX model
+tok = DeepcutTokenizer(model_path="/path/to/custom.onnx")
+tok.segment("สวัสดีครับ")
 ```
 
-The Deepcut model and its ONNX port originate from
-[Deepcut](https://github.com/rkcosmos/deepcut) and
-[LEKCut](https://github.com/PyThaiNLP/LEKCut).
+### Parallel and distributed environments
+
+Each tokenizer instance is **read-only after construction** and safe to
+call from multiple Python threads concurrently — no locking is needed:
+
+```python
+import concurrent.futures
+from nlpo3 import NewmmTokenizer
+
+# Create once, share across all workers.
+tok = NewmmTokenizer("path/to/dict.txt")
+
+texts = ["สวัสดีครับ", "การตัดคำ", "ภาษาไทย"]
+
+with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+    results = list(pool.map(tok.segment, texts))
+```
+
+For multiprocessing (separate processes), each process creates its own
+instance. Loading a 62k-word dictionary typically takes less than 200 ms.
 
 ### Dictionary
 
-- To keep the library small, nlpO3 does not include a dictionary.
-  Users must provide a dictionary when using the dictionary-based tokenizer.
-- For tokenization dictionaries, try
-  - [words_th.txt][dict-pythainlp] from [PyThaiNLP][pythainlp]
-    - ~62,000 words
-    - CC0-1.0
-  - [word break dictionary][dict-libthai] from [libthai][libthai]
-    - consists of dictionaries in different categories, with a make script
-    - LGPL-2.1
+To keep the library small, nlpO3 does not include a dictionary.
+For dictionary-based tokenizers you must provide one.
+
+Recommended dictionaries:
+
+- [words_th.txt][dict-pythainlp] from [PyThaiNLP][pythainlp]
+  (~62,000 words, CC0-1.0)
+- [word break dictionary][dict-libthai] from [libthai][libthai]
+  (categories, LGPL-2.1)
 
 [pythainlp]: https://github.com/PyThaiNLP/pythainlp
 [libthai]: https://github.com/tlwg/libthai/
@@ -156,18 +152,13 @@ python -m pip install --upgrade build
 python -m build
 ```
 
-This should generate a wheel file, in `dist/` directory,
-which can be installed by pip.
-
-To install a wheel from a local directory:
+This generates a wheel file in `dist/`, installable with pip:
 
 ```bash
 pip install dist/nlpo3-2.0.0-cp311-cp311-macosx_12_0_x86_64.whl
 ```
 
 ### Test
-
-To run a Python unit test:
 
 ```bash
 cd tests
@@ -243,59 +234,3 @@ Versions with a "t" suffix indicate CPython with free threading.
 |              | manylinux | x86_64       | ✓             |
 |              |           | i686         | ✓             |
 |              | musllinux | x86_64       | ✓             |
-| 3.8          | Windows   | x86          | ✓ (v1.3.1)    |
-|              |           | AMD64        | ✓ (v1.3.1)    |
-|              | macOS     | x86_64       | ✓ (v1.3.1)    |
-|              |           | arm64        | ✓ (v1.3.1)    |
-|              | manylinux | x86_64       | ✓ (v1.3.1)    |
-|              |           | i686         | ✓ (v1.3.1)    |
-|              | musllinux | x86_64       | ✓ (v1.3.1)    |
-| 3.7          | Windows   | x86          | ✓ (v1.3.1)    |
-|              |           | AMD64        | ✓ (v1.3.1)    |
-|              | macOS     | x86_64       | ✓ (v1.3.1)    |
-|              |           | arm64        |               |
-|              | manylinux | x86_64       | ✓ (v1.3.1)    |
-|              |           | i686         | ✓ (v1.3.1)    |
-|              | musllinux | x86_64       | ✓ (v1.3.1)    |
-| GraalPy 3.12 | Windows   | x86          |               |
-|              |           | AMD64        |               |
-|              | macOS     | x86_64       | ✓             |
-|              |           | arm64        | ✓             |
-|              | manylinux | x86_64       | ✓             |
-|              |           | i686         |               |
-| GraalPy 3.11 | Windows   | x86          |               |
-|              |           | AMD64        |               |
-|              | macOS     | x86_64       | ✓             |
-|              |           | arm64        | ✓             |
-|              | manylinux | x86_64       | ✓             |
-|              |           | i686         |               |
-| PyPy 3.11    | Windows   | x86          |               |
-|              |           | AMD64        | ✓             |
-|              | macOS     | x86_64       | ✓             |
-|              |           | arm64        | ✓             |
-|              | manylinux | x86_64       | ✓             |
-|              |           | i686         | ✓             |
-| PyPy 3.10    | Windows   | x86          |               |
-|              |           | AMD64        | ✓ (v1.3.1)    |
-|              | macOS     | x86_64       | ✓ (v1.3.1)    |
-|              |           | arm64        | ✓ (v1.3.1)    |
-|              | manylinux | x86_64       | ✓ (v1.3.1)    |
-|              |           | i686         | ✓ (v1.3.1)    |
-| PyPy 3.9     | Windows   | x86          |               |
-|              |           | AMD64        | ✓ (v1.3.1)    |
-|              | macOS     | x86_64       | ✓ (v1.3.1)    |
-|              |           | arm64        | ✓ (v1.3.1)    |
-|              | manylinux | x86_64       | ✓ (v1.3.1)    |
-|              |           | i686         | ✓ (v1.3.1)    |
-| PyPy 3.8     | Windows   | x86          |               |
-|              |           | AMD64        | ✓ (v1.3.1)    |
-|              | macOS     | x86_64       | ✓ (v1.3.1)    |
-|              |           | arm64        | ✓ (v1.3.1)    |
-|              | manylinux | x86_64       | ✓ (v1.3.1)    |
-|              |           | i686         | ✓ (v1.3.1)    |
-| PyPy 3.7     | Windows   | x86          |               |
-|              |           | AMD64        | ✓ (v1.3.1)    |
-|              | macOS     | x86_64       | ✓ (v1.3.1)    |
-|              |           | arm64        |               |
-|              | manylinux | x86_64       | ✓ (v1.3.1)    |
-|              |           | i686         | ✓ (v1.3.1)    |

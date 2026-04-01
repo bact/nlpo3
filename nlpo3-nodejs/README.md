@@ -11,11 +11,14 @@ Node.js binding for nlpO3, a Thai natural language processing library in Rust.
 
 ## Features
 
-- Thai word tokenizer
-  - Use maximal-matching dictionary-based tokenization algorithm
-    and honor [Thai Character Cluster][tcc] boundaries
-  - Fast backend in Rust
-  - Support custom dictionary
+- Three interchangeable Thai word tokenizers:
+  - `NewmmTokenizer` — dictionary-based maximal-matching (TrieChar backend,
+    fastest, ~43 MB for 62k words)
+  - `NewmmFstTokenizer` — same algorithm with FST backend (~49× less memory)
+  - `DeepcutTokenizer` — neural CNN model (no dictionary needed)
+- All tokenizers honor [Thai Character Cluster][tcc] boundaries
+- Each instance is read-only after construction and safe to reuse across
+  many concurrent async calls on the Node.js event loop
 
 [tcc]: https://dl.acm.org/doi/10.1145/355214.355225
 
@@ -24,7 +27,8 @@ Node.js binding for nlpO3, a Thai natural language processing library in Rust.
 ### Requirements
 
 - [Rust 2024 Edition](https://www.rust-lang.org/tools/install)
-- Node.js v12 or newer
+- Node.js 24 (LTS) or newer
+- TypeScript 6
 
 ### Steps
 
@@ -33,69 +37,112 @@ Node.js binding for nlpO3, a Thai natural language processing library in Rust.
 npm run release
 ```
 
-Before build, your `nlpo3/` directory should look like this:
+After build, `nlpo3/` contains:
 
 ```text
-- nlpo3/
-    - index.ts
-    - rust_mod.d.ts
-```
-
-After build:
-
-```text
-- nlpo3/
-    - index.js
-    - index.ts
-    - rust_mod.d.ts
-    - rust_mode.node
+nlpo3/
+  index.js          ← compiled TypeScript (main entry point)
+  index.d.ts        ← TypeScript declarations
+  index.ts          ← TypeScript source
+  rust_mod.d.ts     ← Rust native module declarations
+  rust_mod.node     ← compiled Rust native addon
 ```
 
 ## Install
 
-For now, copy the whole `nlpo3/` directory after build to your project.
-
-### npm (experitmental)
-
-npm is still experimental and may not work on all platforms.
-Please report issues at <https://github.com/PyThaiNLP/nlpo3/issues>
-
 ```shell
-npm i nlpo3
+npm i nlpo3-nodejs
 ```
 
 ## Usage
 
-In JavaScript:
+### JavaScript
 
 ```javascript
-const nlpO3 = require(`${path_to_nlpo3}`)
+const { NewmmTokenizer, NewmmFstTokenizer, DeepcutTokenizer } = require("nlpo3-nodejs");
 
-// load dictionary and tokenize a text with it
-nlpO3.loadDict("path/to/dict.file", "dict_name")
-nloO3.segment("สวัสดีครับ", "dict_name")
+// Dictionary-based tokenizer (TrieChar backend — fastest)
+// Create once, reuse for every call — the dictionary is loaded only once.
+const tok = new NewmmTokenizer("/path/to/dict.txt");
+tok.segment("สวัสดีครับ");
+// => ["สวัสดี", "ครับ"]
+
+// Same options as newmm, but FST backend uses ~49x less memory
+const fstTok = new NewmmFstTokenizer("/path/to/dict.txt");
+fstTok.segment("สวัสดีครับ");
+
+// Neural CNN tokenizer — no dictionary needed
+const dc = new DeepcutTokenizer();
+dc.segment("สวัสดีครับ");
 ```
 
-In TypeScript:
+### TypeScript
 
 ```typescript
-import {segment, loadDict} from `${path_to_nlpo3}/index`
+import { NewmmTokenizer, NewmmFstTokenizer, DeepcutTokenizer, SegmentOptions } from "nlpo3-nodejs";
 
-// load custom dictionary and tokenize a text with it
-loadDict("path/to/dict.file", "dict_name")
-segment("สวัสดีครับ", "dict_name")
+// Create once, reuse the same instance across all calls.
+// The dictionary is loaded only once; all segment() calls share it.
+const tok = new NewmmTokenizer("/path/to/dict.txt");
+
+const tokens: string[] = tok.segment("สวัสดีครับ");
+
+// Optional flags
+const opts: SegmentOptions = { safe: true, parallel: false };
+tok.segment("สวัสดีครับ", opts);
+
+// FST backend — less memory, same API
+const fstTok = new NewmmFstTokenizer("/path/to/dict.txt");
+fstTok.segment("สวัสดีครับ");
+
+// Neural tokenizer
+const dc = new DeepcutTokenizer();
+dc.segment("สวัสดีครับ");
 ```
 
-## Issues
+### Parallel / distributed environments
 
-Please report issues at <https://github.com/PyThaiNLP/nlpo3/issues>
+Each tokenizer instance is **read-only after construction** and safe to call
+from many concurrent async operations on the same Node.js event loop:
 
-## TODO
+```typescript
+// One tokenizer serves all requests — the dictionary is never reloaded.
+const tok = new NewmmTokenizer("/path/to/dict.txt");
 
-- Find a way to build binaries and publish on npm.
+app.get("/segment", (req, res) => {
+    res.json({ tokens: tok.segment(req.query.text as string) });
+});
+```
+
+For Node.js worker threads, each worker creates its own instance.
+Loading a 62k-word dictionary typically takes less than 200 ms.
+
+### Segment options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `safe` | `boolean` | `false` | Avoid long run times on inputs with many ambiguous word boundaries |
+| `parallel` | `boolean` | `false` | Use Rayon multi-threading internally (higher memory use) |
+
+`DeepcutTokenizer.segment()` does not accept options; the neural model has a fixed inference path.
+
+### Dictionary
+
+To keep the library small, nlpO3 does not include a dictionary.
+For dictionary-based tokenizers you must provide one.
+
+Recommended dictionaries:
+
+- [words_th.txt][dict-pythainlp] from [PyThaiNLP][pythainlp] (~62,000 words, CC0-1.0)
+- [word break dictionary][dict-libthai] from [libthai][libthai] (LGPL-2.1)
+
+[pythainlp]: https://github.com/PyThaiNLP/pythainlp
+[libthai]: https://github.com/tlwg/libthai/
+[dict-pythainlp]: https://github.com/PyThaiNLP/pythainlp/blob/dev/pythainlp/corpus/words_th.txt
+[dict-libthai]: https://github.com/tlwg/libthai/tree/master/data
 
 ## License
 
-nlpO3 Node binding is copyrighted by its authors
+nlpO3 Node.js binding is copyrighted by its authors
 and licensed under terms of the Apache Software License 2.0 (Apache-2.0).
 See file [LICENSE](./LICENSE) for details.

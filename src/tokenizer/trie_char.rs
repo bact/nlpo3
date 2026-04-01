@@ -15,7 +15,7 @@ use crate::char_string::CharString;
 use crate::tokenizer::dict_backend::DictBackend;
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct TrieNode {
     children: HashMap<char, Self>,
     end: bool,
@@ -87,7 +87,7 @@ impl TrieNode {
 /// directly with Rust's standard UTF-8 string types without any intermediate
 /// encoding: each `&str` is decoded once on the way in, and lookups compare
 /// decoded `char` values.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TrieChar {
     words: HashSet<String>,
     root: TrieNode,

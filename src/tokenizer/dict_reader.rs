@@ -8,33 +8,34 @@ use crate::char_string::CharString;
 
 use super::fst_dict::FstDict;
 use super::trie_char::TrieChar as Trie;
+use anyhow::Result;
+use std::fs::File;
 use std::io::BufReader;
-use std::{error::Error, io::prelude::*};
-use std::{fs::File, path::PathBuf};
+use std::{io::prelude::*, path::PathBuf};
 
 pub enum DictSource {
     FilePath(PathBuf),
     WordList(Vec<String>),
 }
 
-pub fn create_dict_trie(source: DictSource) -> Result<Trie, Box<dyn Error>> {
+pub fn create_dict_trie(source: DictSource) -> Result<Trie> {
     match source {
         DictSource::FilePath(file_path) => {
-            let file_reader = File::open(file_path.as_path());
-            match file_reader {
-                Ok(file) => {
-                    let mut reader = BufReader::new(file);
-                    let mut line = String::with_capacity(50);
-                    let mut dict: Vec<CharString> = Vec::with_capacity(600);
-                    while reader.read_line(&mut line).unwrap() != 0 {
-                        dict.push(CharString::new(&line));
-                        line.clear();
-                    }
-                    dict.shrink_to_fit();
-                    Ok(Trie::new(&dict))
-                }
-                Err(error) => Err(Box::from(error)),
+            let file = File::open(file_path.as_path())
+                .map_err(|e| anyhow::anyhow!("failed to open dictionary: {}", e))?;
+            let mut reader = BufReader::new(file);
+            let mut line = String::with_capacity(50);
+            let mut dict: Vec<CharString> = Vec::with_capacity(600);
+            while reader
+                .read_line(&mut line)
+                .map_err(|e| anyhow::anyhow!("failed to read dictionary: {}", e))?
+                != 0
+            {
+                dict.push(CharString::new(&line));
+                line.clear();
             }
+            dict.shrink_to_fit();
+            Ok(Trie::new(&dict))
         }
         DictSource::WordList(word_list) => {
             let char_word_list: Vec<CharString> =
@@ -44,14 +45,17 @@ pub fn create_dict_trie(source: DictSource) -> Result<Trie, Box<dyn Error>> {
     }
 }
 
-pub fn create_dict_fst(source: DictSource) -> Result<FstDict, Box<dyn Error>> {
+pub fn create_dict_fst(source: DictSource) -> Result<FstDict> {
     match source {
         DictSource::FilePath(file_path) => {
-            let content = std::fs::read_to_string(file_path)?;
+            let content = std::fs::read_to_string(&file_path)
+                .map_err(|e| anyhow::anyhow!("failed to read dictionary {:?}: {}", file_path, e))?;
             FstDict::from_words(content.lines().map(|l| l.trim()))
+                .map_err(|e| anyhow::anyhow!("failed to build FST dictionary: {}", e))
         }
         DictSource::WordList(word_list) => {
             FstDict::from_words(word_list.iter().map(|s| s.as_str()))
+                .map_err(|e| anyhow::anyhow!("failed to build FST dictionary: {}", e))
         }
     }
 }

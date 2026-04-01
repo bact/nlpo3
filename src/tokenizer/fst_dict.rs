@@ -110,6 +110,7 @@ impl Error for FstDictError {}
 ///
 /// Words are UTF-8 strings stored in a minimized finite state automaton.
 /// Dynamic additions and removals are tracked in small delta sets.
+#[derive(Clone)]
 pub struct FstDict {
     /// Immutable base set, sorted lexicographically.
     base: Set<Vec<u8>>,
@@ -152,8 +153,7 @@ impl FstDict {
                 .insert(word.as_bytes())
                 .map_err(|e| FstDictError(format!("FST insert error: {}", e)))?;
         }
-        let set = builder
-            .into_set();
+        let set = builder.into_set();
 
         Ok(Self {
             base: set,
