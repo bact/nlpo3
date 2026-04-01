@@ -33,6 +33,10 @@ maintenance = { status = "actively-developed" }
 name = "nlpo3"
 path = "src/main.rs"
 
+[features]
+default = ["deepcut"]
+deepcut = ["nlpo3/deepcut"]
+
 [dependencies]
 clap = { version = "4.6", features = ["derive"] }
 nlpo3 = { version = "2.0", path = ".." }

@@ -26,9 +26,12 @@ exclude = ["index.node"]
 [lib]
 crate-type = ["cdylib"]
 
+[features]
+default = ["deepcut"]
+deepcut = ["nlpo3/deepcut"]
+
 [dependencies]
 ahash = "0.8"
-lazy_static = "1.5"
 nlpo3 = { version = "2.0", path = ".." }
 
 [dependencies.neon]
