@@ -17,7 +17,7 @@ on a single-threaded workload. Each timing is the **mean** of 100 samples
 | Tokenizer | Algorithm | Dictionary | Speed | Dict memory |
 |-----------|-----------|------------|-------|-------------|
 | `NewmmTokenizer` | Maximal matching + TCC | `TrieChar` | fastest | ~43 MB |
-| `NewmmFstTokenizer` | Maximal matching + TCC | `FstDictionary` | moderate | ~0.85 MB |
+| `NewmmFstTokenizer` | Maximal matching + TCC | `FstDict` | moderate | ~0.85 MB |
 | `DeepcutTokenizer` | CNN / ONNX | bundled model | slowest | fixed |
 
 All three implement the same [`Tokenizer`] trait:
@@ -56,7 +56,7 @@ let tok: Box<dyn Tokenizer> = Box::new(DeepcutTokenizer::new()?);
 | Implementation | Time for 62 018 words |
 |---|---:|
 | `TrieChar::new` | 65.3 ms |
-| `FstDictionary::from_words` | 62.2 ms |
+| `FstDict::from_words` | 62.2 ms |
 
 Construction time is similar. FST construction sorts the input and builds a
 minimized automaton; `TrieChar` inserts into a `HashMap`-based trie.
@@ -70,15 +70,15 @@ Finding all dictionary entries that are prefixes of a query string.
 | Implementation | short_thai (5 chars) | mixed (7 chars) | medium_thai (14 chars) |
 |---|---:|---:|---:|
 | `TrieChar::prefix_ref` | **62 ns** | **72 ns** | **86 ns** |
-| `FstDictionary::prefix_lengths` | 3 741 ns | 2 041 ns | 4 393 ns |
+| `FstDict::prefix_lengths` | 3 741 ns | 2 041 ns | 4 393 ns |
 | Ratio | **60× faster** | **28× faster** | **51× faster** |
 
 `TrieChar` wins on lookup speed because it navigates a `HashMap` per character
-(O(k) pointer chasing, cache-friendly for short words). `FstDictionary`
+(O(k) pointer chasing, cache-friendly for short words). `FstDict`
 runs a streaming FST search with higher per-call overhead.
 
 **Recommendation:** use `TrieChar` (`NewmmTokenizer`) for the hot tokenization
-path; use `FstDictionary` (`NewmmFstTokenizer`) when memory is constrained.
+path; use `FstDict` (`NewmmFstTokenizer`) when memory is constrained.
 
 ---
 
@@ -99,7 +99,7 @@ scales with input length at a different rate.
 **Conclusions:**
 
 - `NewmmTokenizer` is the fastest dictionary-based tokenizer. The `TrieChar`
-  prefix-lookup loop is ~10–60× faster per query than `FstDictionary`.
+  prefix-lookup loop is ~10–60× faster per query than `FstDict`.
 - `NewmmFstTokenizer` is the memory-efficient alternative: 49× smaller
   dictionary with 9–13× lower throughput.
 - The `Tokenizer` trait makes switching between all three tokenizers trivial.
@@ -121,13 +121,13 @@ entry (4 bytes) = ~7 bytes/char for Thai, less for ASCII.
 
 | Structure | Total bytes | Per word |
 |---|---:|---:|
-| `FstDictionary` (FST automaton) | 891 464 bytes (~0.85 MB) | **14.4 bytes** |
+| `FstDict` (FST automaton) | 891 464 bytes (~0.85 MB) | **14.4 bytes** |
 | `TrieChar` (trie with HashMap nodes, estimated) | ~43 MB | **~699 bytes** |
 | Reduction | | **~49× smaller** |
 
 The FST stores the full 62 018-word Thai dictionary in under 1 MB. The
 `TrieChar` trie stores roughly 80 bytes per character edge in `HashMap`
-entries. For memory-constrained deployments, `FstDictionary` is the preferred
+entries. For memory-constrained deployments, `FstDict` is the preferred
 choice.
 
 ### DeepcutTokenizer model

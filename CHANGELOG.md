@@ -16,13 +16,13 @@ conventions. Version numbers follow [Semantic Versioning](https://semver.org/).
   zero-copy `as_str()` slicing.
 - `src/tokenizer/dict_backend.rs`: `DictBackend` trait that decouples the
   string representation (`CharString`) from the dictionary backend. Implemented
-  by both `TrieChar` and `FstDictionary`.
-- `src/tokenizer/fst_dict.rs`: `FstDictionary` — a memory-efficient dictionary
+  by both `TrieChar` and `FstDict`.
+- `src/tokenizer/fst_dict.rs`: `FstDict` — a memory-efficient dictionary
   backed by `fst::Set` (minimized finite-state automaton). Stores the 62 k-word
   Thai dictionary in ~0.85 MB (≈14 bytes/word) compared with ~43 MB
   (≈699 bytes/word) for `TrieChar`.
 - `src/tokenizer/newmm.rs`: `NewmmFstTokenizer` — a concrete tokenizer struct
-  (CharString + FstDictionary backend) with the same API as `NewmmTokenizer`.
+  (CharString + FstDict backend) with the same API as `NewmmTokenizer`.
 - `src/tokenizer/deepcut.rs`: `DeepcutTokenizer` — CNN-based Thai word tokenizer
   using ONNX inference via `tract-onnx`. Based on
   [LEKCut](https://github.com/PyThaiNLP/LEKCut) and

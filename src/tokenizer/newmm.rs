@@ -111,7 +111,7 @@ impl Error for BFSSearchError {}
 /// // Maximum speed (CharString + TrieChar):
 /// let tok: Box<dyn Tokenizer> = Box::new(NewmmTokenizer::new("words_th.txt"));
 ///
-/// // Compact memory (CharString + FstDictionary):
+/// // Compact memory (CharString + FstDict):
 /// let tok: Box<dyn Tokenizer> = Box::new(NewmmFstTokenizer::new("words_th.txt"));
 /// ```
 #[derive(Debug)]
@@ -119,21 +119,21 @@ pub struct NewmmTokenizer<D: DictBackend = TrieChar> {
     dict: Box<D>,
 }
 
-/// Memory-efficient dictionary-based tokenizer (CharString + FstDictionary).
+/// Memory-efficient dictionary-based tokenizer (CharString + FstDict).
 ///
 /// Uses the same `CharString` representation and the same maximal-matching
 /// algorithm as [`NewmmTokenizer`], but stores the dictionary in a minimized
-/// finite-state automaton ([`FstDictionary`]).  This reduces dictionary memory
+/// finite-state automaton ([`FstDict`]).  This reduces dictionary memory
 /// by ~49× at the cost of slower per-lookup speed.
 ///
 /// Implements the same [`Tokenizer`] trait as [`NewmmTokenizer`] and
 /// `DeepcutTokenizer`, so tokenizers are interchangeable at any call site
 /// that accepts `&dyn Tokenizer`.
 ///
-/// [`FstDictionary`]: super::fst_dict::FstDictionary
+/// [`FstDict`]: super::fst_dict::FstDict
 #[derive(Debug)]
 pub struct NewmmFstTokenizer {
-    inner: NewmmTokenizer<super::fst_dict::FstDictionary>,
+    inner: NewmmTokenizer<super::fst_dict::FstDict>,
 }
 
 impl NewmmTokenizer<TrieChar> {
@@ -155,7 +155,7 @@ impl NewmmTokenizer<TrieChar> {
 }
 
 impl NewmmFstTokenizer {
-    /// Create a tokenizer from a dictionary file (FstDictionary backend).
+    /// Create a tokenizer from a dictionary file (FstDict backend).
     pub fn new(dict_path: &str) -> Self {
         Self {
             inner: NewmmTokenizer {
@@ -166,7 +166,7 @@ impl NewmmFstTokenizer {
         }
     }
 
-    /// Create a tokenizer from a word list (FstDictionary backend).
+    /// Create a tokenizer from a word list (FstDict backend).
     pub fn from_word_list(word_list: Vec<String>) -> Self {
         Self {
             inner: NewmmTokenizer {

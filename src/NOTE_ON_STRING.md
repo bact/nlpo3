@@ -66,13 +66,13 @@ have been removed.
 
 ## Dictionary: FST-backed (optional)
 
-The `FstDictionary` type in `src/tokenizer/fst_dict.rs` provides a
+The `FstDict` type in `src/tokenizer/fst_dict.rs` provides a
 memory-efficient alternative to `TrieChar` for storing the word list. It uses
 the `fst` crate (finite state transducers) which stores sorted string sets in
 a minimized DFA, achieving a few bytes per entry versus tens of bytes per
 trie node.
 
-`FstDictionary` supports:
+`FstDict` supports:
 - O(k) prefix lookup via `prefix_lengths(text)` (where k = text length).
 - Dynamic add/remove operations via small delta `HashSet`s.
 

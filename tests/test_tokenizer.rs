@@ -307,7 +307,7 @@ fn test_thai_number() {
 }
 
 // ---------------------------------------------------------------------------
-// NewmmFstTokenizer (CharString + FstDictionary backend)
+// NewmmFstTokenizer (CharString + FstDict backend)
 // ---------------------------------------------------------------------------
 
 use nlpo3::tokenizer::newmm::NewmmFstTokenizer;

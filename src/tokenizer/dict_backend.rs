@@ -5,9 +5,9 @@
  * Dictionary backend trait for `NewmmTokenizer`.
  *
  * `DictBackend` is the single interface that `NewmmTokenizer` requires from
- * its dictionary. Both `TrieChar` and `FstDictionary` implement this trait,
+ * its dictionary. Both `TrieChar` and `FstDict` implement this trait,
  * which means the tokenizer's string-representation choice (`CharString`)
- * and the dictionary-representation choice (`TrieChar` vs `FstDictionary`)
+ * and the dictionary-representation choice (`TrieChar` vs `FstDict`)
  * are **completely independent**.
  *
  * # Which backend to choose?
@@ -15,10 +15,10 @@
  * | Backend | Prefix-lookup speed | Memory | Add/remove |
  * |---------|---------------------|--------|------------|
  * | `TrieChar` | very fast (pointer-chasing trie) | ~43 MB for 62k words | O(k) |
- * | `FstDictionary` | slower (streaming FST) | ~0.85 MB for 62k words | O(k) via delta sets |
+ * | `FstDict` | slower (streaming FST) | ~0.85 MB for 62k words | O(k) via delta sets |
  *
  * Use `TrieChar` (the default) for maximum tokenization speed.
- * Use `FstDictionary` when memory is constrained or the dictionary is large.
+ * Use `FstDict` when memory is constrained or the dictionary is large.
  */
 use crate::char_string::CharString;
 
