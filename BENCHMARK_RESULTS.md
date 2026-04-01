@@ -42,7 +42,7 @@ let tok: Box<dyn Tokenizer> = Box::new(DeepcutTokenizer::new()?);
 ## Benchmark environment
 
 - Rust: stable (release profile, `lto = true`, `codegen-units = 1`)
-- Criterion.rs: 0.8 (uses `std::hint::black_box` instead of the deprecated `criterion::black_box`)
+- Criterion.rs: 0.8
 - Dictionary: `words_th.txt`, 62 018 words
 - Text sizes:
   - **short** – 28 Unicode characters, Thai-only
