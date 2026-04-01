@@ -13,12 +13,8 @@ categories = ["text-processing", "command-line-utilities"]
 keywords = [
     "thai",
     "tokenizer",
-    "tokenization",
-    "text-processing",
     "nlp",
-    "natural-language-processing",
-    "word-segmentation",
-    "pythainlp",
+    "text-processing",
     "cli",
 ]
 homepage = "https://github.com/PyThaiNLP/nlpo3/tree/main/nlpo3-cli/"

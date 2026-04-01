@@ -10,11 +10,8 @@ categories = ["text-processing"]
 keywords = [
     "thai",
     "tokenizer",
-    "tokenization",
-    "text-processing",
     "nlp",
-    "natural-language-processing",
-    "word-segmentation",
+    "text-processing",
     "pythainlp",
 ]
 homepage = "https://github.com/PyThaiNLP/nlpo3/"

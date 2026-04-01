@@ -14,7 +14,6 @@ authors:
     given-names: Wannaphong
     orcid: "https://orcid.org/0000-0002-4153-4354"
 repository-code: "https://github.com/PyThaiNLP/nlpo3/"
-repository: "https://github.com/PyThaiNLP/nlpo3/"
 url: "https://github.com/PyThaiNLP/nlpo3/tree/main/nlpo3-python"
 abstract: "Python binding for nlpO3, a Thai natural language processing library in Rust."
 keywords:
