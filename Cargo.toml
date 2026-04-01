@@ -54,7 +54,7 @@ lazy_static = "1.5"
 rayon = "1.11"
 regex = "1.12"
 rustc-hash = "2.1"
-ndarray = { version = "0.17", optional = true }
+ndarray = { version = "0.16", optional = true }
 tract-onnx = { version = "0.22", optional = true }
 
 [dev-dependencies]
