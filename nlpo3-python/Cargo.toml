@@ -1,7 +1,7 @@
 [package]
 name = "nlpo3-python"
 version = "2.0.0"
-edition = "2021"
+edition = "2024"
 rust-version = "1.88.0"
 license = "Apache-2.0"
 authors = [
@@ -46,5 +46,5 @@ lazy_static = "1.5"
 nlpo3 = { version = "2.0", path = "..", features = ["deepcut"] }
 
 [dependencies.pyo3]
-version = "0.27"
+version = "0.28"
 features = ["extension-module"]
