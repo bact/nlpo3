@@ -76,8 +76,99 @@ trie node.
 - O(k) prefix lookup via `prefix_lengths(text)` (where k = text length).
 - Dynamic add/remove operations via small delta `HashSet`s.
 
+## Rust 2024 edition patterns
+
+The codebase targets the **Rust 2024 edition** (`edition = "2024"`,
+`rust-version = "1.88.0"`) and exploits several features that edition
+stabilizes or refines.
+
+### `let` chains
+
+Complex nested `match` and `while match { true/false }` idioms are replaced
+with `let` chains, which chain pattern conditions directly in `if` and `while`
+guards:
+
+```rust
+// trie_char.rs — double-nested match → let chain
+if let Some(node) = current_node
+    && let Some(child) = node.find_child(ch)
+{
+    // …
+}
+
+// newmm.rs — while match { true / false } → while let && condition
+while let Some(&begin_position) = position_list.peek()
+    && begin_position < text_length
+{
+    // …
+}
+```
+
+### Reference patterns
+
+In the 2024 edition the ergonomics of reference patterns in `for` and
+closure contexts are refined: you can write `&T` on the left-hand side of
+a binding where the iterator yields `&T`, removing the need for an explicit
+`*deref`:
+
+```rust
+// Before (explicit deref)
+for position in idk {                 // position: &usize
+    if *position != goal { … }
+}
+
+// After (reference pattern)
+for &position in idk {                // position: usize — Copy, no deref needed
+    if position != goal { … }
+}
+
+// Tuple reference pattern in a closure
+entries.iter().filter_map(|&(s, idx)| { … })   // was |(s, idx)| { … *idx … }
+```
+
+### `Copy` types by value
+
+Small `Copy` types (such as `char`) are now passed by value rather than by
+reference, avoiding an indirection:
+
+```rust
+// trie_char.rs
+fn find_child(&self, ch: char) -> Option<&Self>        // was &char
+fn find_mut_child(&mut self, ch: char) -> Option<…>    // was &char
+fn remove_child(&mut self, ch: char)                   // was &char
+```
+
+### `entry` API and iterator chains
+
+Duplicated `match get_mut / insert` blocks are replaced with idiomatic
+`HashMap::entry` calls; manual accumulator loops are replaced with
+functional iterator chains:
+
+```rust
+// entry().or_default() replaces match + insert
+graph.entry(begin_position).or_default().push(end_position_candidate);
+
+// filter + last + map replaces a manual for loop
+text.chars()
+    .enumerate()
+    .filter(|&(_, ch)| ch == ' ')
+    .last()
+    .map(|(i, _)| i)
+```
+
+### Removal of `unsafe`
+
+A previously `unsafe { std::str::from_utf8_unchecked(key) }` call in
+`fst_dict.rs` has been replaced with the safe
+`std::str::from_utf8(key).expect("FST keys are valid UTF-8")`.
+The invariant (FST was built from valid UTF-8) is still documented, but is
+now enforced at runtime rather than asserted only by a `// SAFETY:` comment.
+
 ## References
 
 - [Rust String indexing](https://doc.rust-lang.org/book/ch08-02-strings.html#indexing-into-strings)
 - [UTF-8 on Wikipedia](https://en.wikipedia.org/wiki/UTF-8)
 - [`fst` crate documentation](https://docs.rs/fst/)
+- [Rust 2024 edition guide](https://doc.rust-lang.org/edition-guide/rust-2024/)
+- [RFC 3318 — `let` chains](https://github.com/rust-lang/rfcs/pull/3318)
+- [RFC 3627 — match ergonomics 2024](https://github.com/rust-lang/rfcs/pull/3627)

@@ -38,7 +38,8 @@ conventions. Version numbers follow [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
-- **Breaking**: all `Cargo.toml` editions updated from 2018 to 2024.
+- **Breaking**: all `Cargo.toml` editions updated from 2018 to 2024;
+  `rust-version` set to `"1.88.0"` across all packages.
 - **Breaking**: version bumped to 2.0.0 across all packages (nlpo3, nlpo3-cli,
   nlpo3-python, nlpo3-nodejs).
 - `src/tokenizer/newmm.rs`:
@@ -48,12 +49,40 @@ conventions. Version numbers follow [Semantic Versioning](https://semver.org/).
     It is now a standalone concrete struct with clean `new()` / `from_word_list()`
     constructors. All three tokenizers implement `Tokenizer` and are
     interchangeable via `Box<dyn Tokenizer>`.
+  - `one_cut`: replaced `while match { … true/false }` with a Rust 2024
+    `while let … && condition` let chain, eliminating the unreachable arm.
+  - `one_cut`: collapsed duplicated `match get_mut` / `insert` and
+    `if let … else` graph-update blocks into `entry().or_default()` and
+    `entry().or_insert_with()`.
+  - `one_cut` / `bfs_paths_graph`: replaced explicit `*deref` operators with
+    Rust 2024 reference patterns — `for &position in idk`,
+    `if let Some(&first) = peek()`, `for (idx, &token)`, `for &token`.
 - `src/tokenizer/tcc/tcc_rules.rs`: TCC regex patterns use `regex::Regex`
   (Unicode mode) on plain UTF-8 strings.
 - `src/tokenizer/tcc/tcc_tokenizer.rs`: `tcc_pos()` accepts `&str` directly.
-- `src/tokenizer/trie_char.rs`: stores words as `String` (UTF-8), navigates
-  trie nodes by `char`. Implements `DictBackend`.
-- `src/tokenizer/fst_dict.rs`: implements `DictBackend`; adds `Debug` impl.
+- `src/tokenizer/trie_char.rs`:
+  - Stores words as `String` (UTF-8), navigates trie nodes by `char`.
+    Implements `DictBackend`.
+  - `find_child`, `find_mut_child`, `remove_child`: now take `char` by value
+    (a `Copy` type) instead of `&char`; all callers updated.
+  - `prefix_ref`: replaced double-nested `match current_node { … match
+    find_child { … } }` with a Rust 2024 let chain
+    (`if let Some(node) = … && let Some(child) = …`).
+  - `TrieChar::new`: `for word in words` (slice `IntoIterator`) instead of
+    `words.iter()`.
+- `src/tokenizer/fst_dict.rs`:
+  - Implements `DictBackend`; adds `Debug` impl.
+  - Replaced `unsafe { std::str::from_utf8_unchecked(key) }` with safe
+    `std::str::from_utf8(key).expect(…)`.
+- `src/tokenizer/deepcut.rs`:
+  - `build_chars_map`: `|(s, idx)|` closure + `*idx` deref replaced by
+    `|&(s, idx)|` reference pattern.
+  - `build_char_type_map`: `for (group, type_idx)` + `*type_idx` deref
+    replaced by `for &(group, type_idx)` reference pattern.
+- `src/char_string.rs`:
+  - `rfind_space_char_index`: replaced manual `for` loop with an iterator
+    chain using a Rust 2024 reference pattern —
+    `.filter(|&(_, ch)| ch == ' ').last().map(|(i, _)| i)`.
 - `src/tokenizer/dict_reader.rs`: updated to use `CharString`; added
   `create_dict_fst`.
 - `src/tokenizer.rs`: exports `dict_backend` module.
