@@ -38,7 +38,7 @@ conventions. Version numbers follow [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
-- **Breaking**: all `Cargo.toml` editions updated from 2018 to 2021.
+- **Breaking**: all `Cargo.toml` editions updated from 2018 to 2024.
 - **Breaking**: version bumped to 2.0.0 across all packages (nlpo3, nlpo3-cli,
   nlpo3-python, nlpo3-nodejs).
 - `src/tokenizer/newmm.rs`:

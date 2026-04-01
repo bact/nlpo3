@@ -31,10 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Breaking**: version bumped to 2.0.0.
-- Rust crate edition updated from 2018 to 2021.
-- Updated SPDX copyright headers to 2024-2026.
-- Updated author attribution in `src/lib.rs` to credit Thanathip Suntorntip
-  as original author and PyThaiNLP Project as maintainer.
+- Rust crate edition updated from 2018 to 2024.
 
 [Unreleased]: https://github.com/PyThaiNLP/nlpo3/compare/v2.0.0...HEAD
 [2.0.0]: https://github.com/PyThaiNLP/nlpo3/compare/v1.4.0...v2.0.0

@@ -9,6 +9,7 @@ SPDX-License-Identifier: Apache-2.0
 [![Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg "Apache-2.0")](https://opensource.org/licenses/Apache-2.0)
 
 Command line interface for nlpO3, a Thai natural language processing library.
+Originally developed by Vee Satayamas.
 
 ## Install
 

@@ -16,8 +16,10 @@ keywords = [
   "tokenization",
   "text-processing",
   "nlp",
+  "natural-language-processing",
   "word-segmentation",
   "pythainlp",
+  "rust",
 ]
 authors = [
   { name = "Thanathip Suntorntip" },

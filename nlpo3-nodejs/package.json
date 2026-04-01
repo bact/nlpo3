@@ -9,9 +9,13 @@
   "keywords": [
     "thai",
     "tokenizer",
+    "tokenization",
+    "text-processing",
     "nlp",
+    "natural-language-processing",
+    "word-segmentation",
+    "pythainlp",
     "rust",
-    "word-segmentation"
   ],
   "author": {
     "name": "Thanathip Suntorntip Gorlph",

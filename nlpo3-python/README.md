@@ -141,7 +141,7 @@ The Deepcut model and its ONNX port originate from
 
 ### Requirements
 
-- [Rust 2021 Edition](https://www.rust-lang.org/tools/install)
+- [Rust 2024 Edition](https://www.rust-lang.org/tools/install)
 - Python 3.9 or newer
 - Python Development Headers
   - Ubuntu: `sudo apt-get install python3-dev`
