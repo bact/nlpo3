@@ -17,7 +17,7 @@ lazy_static! {
 // and add that tokenizer to the tokenizer collection.
 //
 // Dictionary file must have one word per line.
-// If successful, inserts a NewmmTokenizer to TOKENIZER_COLLECTION.
+// If successful, inserts a NewmmTokenizer into TOKENIZER_COLLECTION.
 // Returns a result string.
 fn load_dict(mut cx: FunctionContext) -> JsResult<JsString> {
     let mut tokenizer_col_lock = TOKENIZER_COLLECTION.lock().unwrap();
