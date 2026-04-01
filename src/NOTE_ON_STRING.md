@@ -156,13 +156,24 @@ text.chars()
     .map(|(i, _)| i)
 ```
 
-### Removal of `unsafe`
+### `unsafe` in hot paths — `SAFETY` comments
 
-A previously `unsafe { std::str::from_utf8_unchecked(key) }` call in
-`fst_dict.rs` has been replaced with the safe
-`std::str::from_utf8(key).expect("FST keys are valid UTF-8")`.
-The invariant (FST was built from valid UTF-8) is still documented, but is
-now enforced at runtime rather than asserted only by a `// SAFETY:` comment.
+`fst_dict.rs` has one intentional `unsafe` block in the `prefix_lengths` hot
+loop:
+
+```rust
+// SAFETY: All keys in the FST were inserted as valid UTF-8 strings in
+// `from_words`. The FST stores raw bytes verbatim and never modifies them,
+// so every key is guaranteed to be valid UTF-8. Using the unchecked variant
+// avoids a redundant byte-scan on every iteration of this hot lookup loop.
+let word = unsafe { std::str::from_utf8_unchecked(key) };
+```
+
+The invariant is established once at construction time in `from_words()`, which
+accepts `&str` inputs (already valid UTF-8) and inserts their raw bytes into
+the FST unchanged. Using `from_utf8_unchecked` in the hot lookup loop avoids
+re-scanning the same bytes on every matching key, which would regress
+`FstDict::prefix_lengths` performance.
 
 ## References
 

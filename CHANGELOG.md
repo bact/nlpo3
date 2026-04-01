@@ -37,6 +37,14 @@ conventions. Version numbers follow [Semantic Versioning](https://semver.org/).
   `rust-version` set to `"1.88.0"` across all packages.
 - **Breaking**: version bumped to 2.0.0 across all packages (nlpo3, nlpo3-cli,
   nlpo3-python, nlpo3-nodejs).
+- `src/tokenizer/fst_dict.rs`: restored `unsafe { from_utf8_unchecked(key) }`
+  with a `// SAFETY:` comment in `prefix_lengths` hot loop. The FST is built
+  exclusively from valid UTF-8 strings in `from_words`, so all keys are
+  guaranteed valid UTF-8; the safe `from_utf8().expect()` was re-validating
+  the same bytes on every call in a hot path.
+- `nlpo3-cli/src/main.rs`: `main()` now returns `Result<(), Box<dyn Error>>`
+  and propagates stdin I/O errors with `?` instead of `panic!`. On error Rust
+  prints the message to stderr and exits with code 1, which is script-friendly.
 
 ### Removed
 

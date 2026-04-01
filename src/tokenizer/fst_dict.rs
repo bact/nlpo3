@@ -223,7 +223,12 @@ impl FstDict {
         let automaton = PrefixOf::new(text);
         let mut stream = self.base.search(&automaton).into_stream();
         while let Some(key) = stream.next() {
-            let word = std::str::from_utf8(key).expect("FST keys are valid UTF-8");
+            // SAFETY: All keys in the FST were inserted as valid UTF-8
+            // strings in `from_words`. The FST stores raw bytes verbatim
+            // and never modifies them, so every key is guaranteed to be
+            // valid UTF-8. Using the unchecked variant avoids a redundant
+            // byte-scan on every iteration of this hot lookup loop.
+            let word = unsafe { std::str::from_utf8_unchecked(key) };
             if !self.removals.contains(word) {
                 let len = word.chars().count();
                 if seen.insert(len) {

@@ -45,7 +45,7 @@ struct SegmentOpts {
     parallel: bool,
 }
 
-fn main() {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let opt = App::parse();
 
     let SubCommand::Segment(segment_opts) = opt.subcommand;
@@ -61,15 +61,14 @@ fn main() {
         Some(path) => NewmmTokenizer::new(path),
     };
     for line_opt in io::stdin().lock().lines() {
-        let cleaned_line = match line_opt {
-            Ok(line) => line.trim_end_matches('\n').to_string(),
-            Err(e) => panic!("Cannot read line: {e}"),
-        };
+        let line = line_opt?;
+        let cleaned_line = line.trim_end_matches('\n');
         let toks = newmm.segment_to_string(
-            &cleaned_line,
+            cleaned_line,
             segment_opts.safe,
             segment_opts.parallel,
         );
         println!("{}", toks.join(segment_opts.word_delimiter.as_str()));
     }
+    Ok(())
 }
