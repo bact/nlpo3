@@ -34,6 +34,8 @@ conventions. Version numbers follow [Semantic Versioning](https://semver.org/).
 - `benches/tokenizer.rs`: updated Criterion benchmark suite covering all three
   tokenizers (`NewmmTokenizer`, `NewmmFstTokenizer`, `DeepcutTokenizer`).
   `DeepcutTokenizer` benchmarks are feature-gated (`--features deepcut`).
+  Criterion upgraded to 0.8; migrated from deprecated `criterion::black_box`
+  to `std::hint::black_box`.
 - `BENCHMARK_RESULTS.md`: benchmark measurements for all three tokenizers.
 
 ### Changed

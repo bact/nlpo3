@@ -8,7 +8,7 @@ SPDX-License-Identifier: Apache-2.0
 This document records the results of running `cargo bench` (and
 `cargo bench --features deepcut` for `DeepcutTokenizer`).
 
-Measurements were collected with [Criterion.rs](https://github.com/bheisler/criterion.rs)
+Measurements were collected with [Criterion.rs](https://github.com/bheisler/criterion.rs) 0.8
 on a single-threaded workload. Each timing is the **mean** of 100 samples
 (10 for slow groups such as dictionary construction).
 
@@ -42,6 +42,7 @@ let tok: Box<dyn Tokenizer> = Box::new(DeepcutTokenizer::new()?);
 ## Benchmark environment
 
 - Rust: stable (release profile, `lto = true`, `codegen-units = 1`)
+- Criterion.rs: 0.8 (uses `std::hint::black_box` instead of the deprecated `criterion::black_box`)
 - Dictionary: `words_th.txt`, 62 018 words
 - Text sizes:
   - **short** – 28 Unicode characters, Thai-only
