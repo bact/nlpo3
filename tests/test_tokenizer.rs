@@ -366,3 +366,55 @@ fn test_tokenizer_trait_switchable() {
         fst.segment_to_string(text, false, false),
     );
 }
+
+/// Regression test for BFS path explosion in `bfs_paths_graph`.
+///
+/// Without the visited-set fix, highly ambiguous tokenization input causes
+/// the BFS queue to grow exponentially (O(2^n)), making this test run for
+/// many seconds or minutes.  With the fix, it must complete in well under
+/// one second.
+#[test]
+fn test_newmm_ambiguous_performance() {
+    use std::time::{Duration, Instant};
+
+    // Build a dictionary with heavily overlapping words (lengths 1–3) using
+    // a small set of standalone Thai consonants.  Each consonant is its own
+    // Thai Character Cluster (TCC), so every character boundary is a valid
+    // split point, maximizing the number of ambiguous paths.
+    let chars = ["ก", "ข", "ค", "ง", "จ"];
+    let mut words: Vec<String> = Vec::new();
+    for &c in &chars {
+        words.push(c.to_string());
+    }
+    for &c1 in &chars {
+        for &c2 in &chars {
+            words.push(format!("{c1}{c2}"));
+        }
+    }
+    for &c1 in &chars {
+        for &c2 in &chars {
+            for &c3 in &chars {
+                words.push(format!("{c1}{c2}{c3}"));
+            }
+        }
+    }
+
+    let tokenizer = NewmmTokenizer::from_word_list(words);
+
+    // 50 repetitions of a five-consonant sequence = 250 characters.
+    // Without the fix this input causes exponential BFS expansion.
+    let text = "กขคงจ".repeat(50);
+
+    let start = Instant::now();
+    let result = tokenizer.segment_to_string(&text, false, false);
+    let elapsed = start.elapsed();
+
+    assert!(
+        !result.is_empty(),
+        "tokenizer must produce at least one token"
+    );
+    assert!(
+        elapsed < Duration::from_secs(1),
+        "tokenization took {elapsed:?}; BFS path explosion may still be present"
+    );
+}
