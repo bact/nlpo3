@@ -367,7 +367,7 @@ fn test_tokenizer_trait_switchable() {
     );
 }
 
-/// Regression test for BFS path explosion in `_bfs_paths_graph`.
+/// Regression test for BFS path explosion in `bfs_paths_graph`.
 ///
 /// Without the visited-set fix, highly ambiguous tokenization input causes
 /// the BFS queue to grow exponentially (O(2^n)), making this test run for
@@ -380,7 +380,7 @@ fn test_newmm_ambiguous_performance() {
     // Build a dictionary with heavily overlapping words (lengths 1–3) using
     // a small set of standalone Thai consonants.  Each consonant is its own
     // Thai Character Cluster (TCC), so every character boundary is a valid
-    // split point, maximising the number of ambiguous paths.
+    // split point, maximizing the number of ambiguous paths.
     let chars = ["ก", "ข", "ค", "ง", "จ"];
     let mut words: Vec<String> = Vec::new();
     for &c in &chars {

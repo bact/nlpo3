@@ -278,8 +278,8 @@ impl<D: DictBackend> NewmmTokenizer<D> {
     ) -> AnyResult<Vec<CharacterIndex>> {
         current_queue.clear();
 
-        // The visited set prevents re-exploring nodes already reached via a
-        // shorter path, converting worst-case BFS from O(2^n) to O(V + E).
+        // The visited set ensures each vertex is enqueued at most once.
+        // This avoids the exponential blow-up from revisiting the same nodes.
         let mut visited: HashSet<CharacterIndex> =
             HashSet::with_capacity_and_hasher(goal - start, Default::default());
         visited.insert(start);

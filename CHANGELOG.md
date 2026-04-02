@@ -15,8 +15,8 @@ conventions. Version numbers follow [Semantic Versioning](https://semver.org/).
 ### Fixed
 
 - `src/tokenizer/newmm.rs`: Resolved exponential BFS path explosion in
-  `bfs_paths_graph`. Added a `visited` set to prevent re-exploring nodes
-  already reached, reducing worst-case complexity from O(2^n) to O(V + E).
+  `bfs_paths_graph`. Added a `visited` set to prevent re-enqueueing and
+  re-exploring nodes already reached, avoiding exponential queue growth.
   Mirrors the fix in
   [PyThaiNLP/pythainlp#1319](https://github.com/PyThaiNLP/pythainlp/pull/1319).
 - `src/tokenizer/newmm.rs`: Clear the ambiguity graph after each commit point
