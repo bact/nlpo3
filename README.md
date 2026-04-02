@@ -65,10 +65,11 @@ See [nlpo3-nodejs](./nlpo3-nodejs/).
 Example:
 
 ```python
-from nlpo3 import load_dict, segment
+from nlpo3 import NewmmTokenizer
 
-load_dict("path/to/dict.file", "dict_name")
-segment("สวัสดีครับ", "dict_name")
+tokenizer = NewmmTokenizer("path/to/dict.file")
+tokens = tokenizer.segment("สวัสดีครับ")
+print(tokens)
 ```
 
 See more at [nlpo3-python](./nlpo3-python/).
@@ -101,8 +102,14 @@ Create a tokenizer from a dictionary file and use it to tokenize a string
 use nlpo3::tokenizer::newmm::NewmmTokenizer;
 use nlpo3::tokenizer::tokenizer_trait::Tokenizer;
 
-let tokenizer = NewmmTokenizer::new("path/to/dict.file");
-let tokens = tokenizer.segment("ห้องสมุดประชาชน", true, false).unwrap();
+fn main() {
+    let tokenizer = NewmmTokenizer::new("path/to/dict.file")
+        .expect("failed to load dictionary file");
+    let tokens = tokenizer
+        .segment("ห้องสมุดประชาชน", true, false)
+        .expect("failed to segment text");
+    println!("{:?}", tokens);
+}
 ```
 
 `segment(text, safe, parallel)`: set `parallel = true` to use Rayon to
@@ -114,20 +121,22 @@ call `segment()` from multiple threads instead — `NewmmTokenizer` is
 Create a tokenizer from a vector of strings:
 
 ```rust
-let words = vec!["ปาลิเมนต์".to_string(), "คอนสติติวชั่น".to_string()];
-let tokenizer = NewmmTokenizer::from_word_list(words);
+    let words = vec!["ปาลิเมนต์".to_string(), "คอนสติติวชั่น".to_string()];
+    let tokenizer = NewmmTokenizer::from_word_list(words);
 ```
 
 Add words to an existing tokenizer:
 
 ```rust
-tokenizer.add_word(&["มิวเซียม"]);
+    let words = vec!["หอ".to_string(), "ศิลป์".to_string()];
+    let mut tokenizer = NewmmTokenizer::from_word_list(words);
+    tokenizer.add_word(&["มิวเซียม", "โรงประลอง"]);
 ```
 
 Remove words from an existing tokenizer:
 
 ```rust
-tokenizer.remove_word(&["กระเพรา", "ชานชลา"]);
+    tokenizer.remove_word(&["บรรจง", "มาลัย"]);
 ```
 
 ### Command-line interface
@@ -148,7 +157,7 @@ See more at [nlpo3-cli](./nlpo3-cli/).
   provide one when using the dictionary-based tokenizer.
   - A dictionary is required for the dictionary-based word tokenizer.
 - For tokenization dictionary, try
-  - [words_th.tx][dict-pythainlp] from [PyThaiNLP][pythainlp]
+  - [words_th.txt][dict-pythainlp] from [PyThaiNLP][pythainlp]
     - ~62,000 words
     - CC0-1.0
   - [word break dictionary][dict-libthai] from [libthai][libthai]
