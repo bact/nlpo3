@@ -10,28 +10,7 @@ All notable changes to this project are documented in this file.
 This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 conventions. Version numbers follow [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
-
-### Fixed
-
-- `src/tokenizer/newmm.rs`: Resolved exponential BFS path explosion in
-  `bfs_paths_graph`. Added a `visited` set to prevent re-enqueueing and
-  re-exploring nodes already reached, avoiding exponential queue growth.
-  Mirrors the fix in
-  [PyThaiNLP/pythainlp#1319](https://github.com/PyThaiNLP/pythainlp/pull/1319).
-- `src/tokenizer/newmm.rs`: Clear the ambiguity graph after each commit point
-  in `one_cut` to prevent unbounded edge accumulation across segments.
-- `src/tokenizer/newmm.rs`: Remove the unnecessary graph edge insertion in the
-  no-candidate branch of `one_cut`; the graph is now cleared there instead,
-  consistent with the commit-point branch.
-
-### Added
-
-- `tests/test_tokenizer.rs`: Added `test_newmm_ambiguous_performance` regression
-  test that verifies tokenization of highly ambiguous input completes within
-  one second.
-
-## [2.0.0] - 2026-04-01
+## [2.0.0] - 2026-04-03
 
 ### Added
 
@@ -122,18 +101,24 @@ conventions. Version numbers follow [Semantic Versioning](https://semver.org/).
   Use tokenizer class instances instead.
 - Custom four-byte string implementation removed. Use `CharString` instead.
 
+### Fixed
+
+- `src/tokenizer/newmm.rs`: Resolved exponential BFS path explosion in
+  `bfs_paths_graph` (#101). 
+  - Mirrors the fix in PyThaiNLP/pythainlp#1319.
+
 ### Migration guide
 
 #### Python
 
 ```python
-# Before (v1.x / early v2.0)
+# Before (v1.x)
 from nlpo3 import load_dict, segment, DeepcutTokenizer, segment_deepcut
 load_dict("path/to/dict.txt", "mydict")
 tokens = segment("สวัสดีครับ", "mydict")
 tokens = segment_deepcut("สวัสดีครับ")
 
-# After (v2.0)
+# Now (v2.0)
 from nlpo3 import NewmmTokenizer, NewmmFstTokenizer, DeepcutTokenizer
 tok = NewmmTokenizer("path/to/dict.txt")
 tokens = tok.segment("สวัสดีครับ")
@@ -143,39 +128,15 @@ tokens = DeepcutTokenizer().segment("สวัสดีครับ")
 #### Node.js / TypeScript
 
 ```typescript
-// Before (v1.x / early v2.0)
+// Before (v1.x)
 loadDict("path/to/dict.txt", "mydict");
 const tokens = segment("สวัสดีครับ", "mydict", false, false);
 
-// After (v2.0)
+// Now (v2.0)
 import { NewmmTokenizer } from "nlpo3-nodejs";
 const tok = new NewmmTokenizer("path/to/dict.txt");
 const tokens = tok.segment("สวัสดีครับ");
 ```
-
-#### CLI
-
-```bash
-# Before
-echo "สวัสดีครับ" | nlpo3 segment --dict-path /path/to/dict.txt
-
-# After (newmm is still default, dict-path still works)
-echo "สวัสดีครับ" | nlpo3 segment --dict-path /path/to/dict.txt
-
-# New: choose tokenizer
-echo "สวัสดีครับ" | nlpo3 segment -t nf
-echo "สวัสดีครับ" | nlpo3 segment -t deepcut
-```
-
-### Performance (from `BENCHMARK_RESULTS.md`)
-
-All three tokenizers use the same `Tokenizer` trait and are interchangeable:
-
-| Tokenizer | short (28 ch) | long (937 ch) | Dict memory |
-| --------- | ------------- | ------------- | ----------- |
-| `NewmmTokenizer` | **2.63 µs** | **165 µs** | ~43 MB |
-| `NewmmFstTokenizer` | 29.5 µs | 2 225 µs | **~0.85 MB** |
-| `DeepcutTokenizer` | - | - | ~3.9 MB model |
 
 ## [1.4.0] - 2024-11-09
 
