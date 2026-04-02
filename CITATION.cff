@@ -13,6 +13,7 @@ authors:
   - family-names: Phatthiyaphaibun
     given-names: Wannaphong
     orcid: "https://orcid.org/0000-0002-4153-4354"
+repository: "https://crates.io/crates/nlpo3"
 repository-code: "https://github.com/PyThaiNLP/nlpo3/"
 url: "https://github.com/PyThaiNLP/nlpo3/"
 abstract: "Thai natural language processing library in Rust, with Python and Node bindings. Formerly oxidized-thainlp."
