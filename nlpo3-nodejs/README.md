@@ -106,11 +106,20 @@ Each tokenizer instance is **read-only after construction** and safe to call
 from many concurrent async operations on the same Node.js event loop:
 
 ```typescript
+import express from "express";
+import { NewmmTokenizer } from "nlpo3-nodejs";
+
 // One tokenizer serves all requests — the dictionary is never reloaded.
 const tok = new NewmmTokenizer("/path/to/dict.txt");
+const app = express();
 
 app.get("/segment", (req, res) => {
-    res.json({ tokens: tok.segment(req.query.text as string) });
+  const text = String(req.query.text ?? "");
+  res.json({ tokens: tok.segment(text) });
+});
+
+app.listen(3000, () => {
+  console.log("Listening on http://localhost:3000");
 });
 ```
 
