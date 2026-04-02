@@ -121,51 +121,22 @@ call `segment()` from multiple threads instead — `NewmmTokenizer` is
 Create a tokenizer from a vector of strings:
 
 ```rust
-use nlpo3::tokenizer::newmm::NewmmTokenizer;
-use nlpo3::tokenizer::tokenizer_trait::Tokenizer;
-
-fn main() {
     let words = vec!["ปาลิเมนต์".to_string(), "คอนสติติวชั่น".to_string()];
     let tokenizer = NewmmTokenizer::from_word_list(words);
-    let tokens = tokenizer
-        .segment("ปาลิเมนต์คอนสติติวชั่น", true, false)
-        .expect("failed to segment text");
-    println!("{:?}", tokens);
-}
 ```
 
 Add words to an existing tokenizer:
 
 ```rust
-use nlpo3::tokenizer::newmm::NewmmTokenizer;
-use nlpo3::tokenizer::tokenizer_trait::Tokenizer;
-
-fn main() {
     let words = vec!["หอ".to_string(), "ศิลป์".to_string()];
     let mut tokenizer = NewmmTokenizer::from_word_list(words);
-    tokenizer.add_word(&["หอศิลป์"]);
-    let tokens = tokenizer
-        .segment("หอศิลป์", true, false)
-        .expect("failed to segment text");
-    println!("{:?}", tokens);
-}
+    tokenizer.add_word(&["มิวเซียม", "โรงประลอง"]);
 ```
 
 Remove words from an existing tokenizer:
 
 ```rust
-use nlpo3::tokenizer::newmm::NewmmTokenizer;
-use nlpo3::tokenizer::tokenizer_trait::Tokenizer;
-
-fn main() {
-    let words = vec!["กระเพรา".to_string(), "ชานชลา".to_string()];
-    let mut tokenizer = NewmmTokenizer::from_word_list(words);
-    tokenizer.remove_word(&["กระเพรา", "ชานชลา"]);
-    let tokens = tokenizer
-        .segment("กระเพราชานชลา", true, false)
-        .expect("failed to segment text");
-    println!("{:?}", tokens);
-}
+    tokenizer.remove_word(&["บรรจง", "มาลัย"]);
 ```
 
 ### Command-line interface
