@@ -43,8 +43,7 @@ const CHAR_TYPE_INDEX_OTHER: u32 = 4;
 /// Probability threshold for classifying a position as a word boundary.
 const WORD_BOUNDARY_THRESHOLD: f32 = 0.5;
 
-type DeepcutModel =
-    RunnableModel<TypedFact, Box<dyn TypedOp>, Graph<TypedFact, Box<dyn TypedOp>>>;
+type DeepcutModel = RunnableModel<TypedFact, Box<dyn TypedOp>, Graph<TypedFact, Box<dyn TypedOp>>>;
 
 // ---------------------------------------------------------------------------
 // Vocabulary tables (constant data; shared across all instances)
@@ -266,7 +265,10 @@ fn build_char_type_map() -> HashMap<char, u32> {
             1,
         ),
         // n (3) — rare Thai consonants: ฅฉผฟฌหฮ
-        ("\u{0E05}\u{0E09}\u{0E1C}\u{0E1F}\u{0E0C}\u{0E2B}\u{0E2E}", 3),
+        (
+            "\u{0E05}\u{0E09}\u{0E1C}\u{0E1F}\u{0E0C}\u{0E2B}\u{0E2E}",
+            3,
+        ),
         // v (10) — Thai vowels: ะาำิีืึุู
         (
             "\u{0E30}\u{0E32}\u{0E33}\u{0E34}\u{0E35}\u{0E37}\u{0E36}\
@@ -334,12 +336,11 @@ fn load_model_from_bytes(bytes: &[u8]) -> AnyResult<DeepcutModel> {
     // assigning the same TDim to both so tract can satisfy the internal shape
     // constraint.  If the factoid is `Any` (shape fully unknown), use a
     // dtype-only fact and let tract infer both inputs freely.
-    let shared_fact =
-        if let Some(batch_tdim) = dims0.first().and_then(|d| d.concretize()) {
-            InferenceFact::dt_shape(f32::datum_type(), tvec![batch_tdim, N_PAD.into()])
-        } else {
-            InferenceFact::dt(f32::datum_type())
-        };
+    let shared_fact = if let Some(batch_tdim) = dims0.first().and_then(|d| d.concretize()) {
+        InferenceFact::dt_shape(f32::datum_type(), tvec![batch_tdim, N_PAD.into()])
+    } else {
+        InferenceFact::dt(f32::datum_type())
+    };
 
     inf_model
         .with_input_fact(0, shared_fact.clone())
@@ -392,7 +393,11 @@ fn build_features(text_chars: &[char]) -> (Vec<f32>, Vec<f32>) {
         }
         // Current character
         x_char.push(*CHARS_MAP.get(&padded[i]).unwrap_or(&CHAR_INDEX_OTHER) as f32);
-        x_type.push(*CHAR_TYPE_MAP.get(&padded[i]).unwrap_or(&CHAR_TYPE_INDEX_OTHER) as f32);
+        x_type.push(
+            *CHAR_TYPE_MAP
+                .get(&padded[i])
+                .unwrap_or(&CHAR_TYPE_INDEX_OTHER) as f32,
+        );
     }
 
     (x_char, x_type)
@@ -445,8 +450,9 @@ impl DeepcutTokenizer {
     /// The model must be compatible with the deepcut input/output schema
     /// (two `float32` inputs of shape `[n, 21]`).
     pub fn from_path(model_path: &std::path::Path) -> AnyResult<Self> {
-        let bytes = std::fs::read(model_path)
-            .map_err(|e| anyhow::anyhow!("deepcut: failed to read model file {:?}: {}", model_path, e))?;
+        let bytes = std::fs::read(model_path).map_err(|e| {
+            anyhow::anyhow!("deepcut: failed to read model file {:?}: {}", model_path, e)
+        })?;
         Ok(DeepcutTokenizer {
             model: Arc::new(load_model_from_bytes(&bytes)?),
         })

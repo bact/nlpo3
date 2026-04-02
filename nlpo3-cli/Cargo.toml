@@ -13,12 +13,8 @@ categories = ["text-processing", "command-line-utilities"]
 keywords = [
     "thai",
     "tokenizer",
-    "tokenization",
-    "text-processing",
     "nlp",
-    "natural-language-processing",
-    "word-segmentation",
-    "pythainlp",
+    "text-processing",
     "cli",
 ]
 homepage = "https://github.com/PyThaiNLP/nlpo3/tree/main/nlpo3-cli/"
@@ -32,6 +28,10 @@ maintenance = { status = "actively-developed" }
 [[bin]]
 name = "nlpo3"
 path = "src/main.rs"
+
+[features]
+default = ["deepcut"]
+deepcut = ["nlpo3/deepcut"]
 
 [dependencies]
 clap = { version = "4.6", features = ["derive"] }

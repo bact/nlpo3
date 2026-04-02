@@ -1,69 +1,123 @@
 // SPDX-FileCopyrightText: 2024-2026 PyThaiNLP Project
 // SPDX-License-Identifier: Apache-2.0
 
-use std::sync::Mutex;
+use neon::{prelude::*, types::Finalize};
+use nlpo3::tokenizer::{
+    newmm::{NewmmFstTokenizer, NewmmTokenizer},
+    tokenizer_trait::Tokenizer,
+};
 
-use ahash::AHashMap as HashMap;
-use lazy_static::lazy_static;
-use neon::prelude::*;
-use nlpo3::tokenizer::{newmm::NewmmTokenizer, tokenizer_trait::Tokenizer};
+#[cfg(feature = "deepcut")]
+use nlpo3::tokenizer::deepcut::DeepcutTokenizer;
 
-lazy_static! {
-    static ref TOKENIZER_COLLECTION: Mutex<HashMap<String, Box<NewmmTokenizer>>> =
-        Mutex::new(HashMap::new());
-}
-
-// Load a dictionary file to a tokenizer,
-// and add that tokenizer to the tokenizer collection.
+// ---------------------------------------------------------------------------
+// Opaque wrapper — holds any tokenizer behind a trait object.
 //
-// Dictionary file must have one word per line.
-// If successful, inserts a NewmmTokenizer into TOKENIZER_COLLECTION.
-// Returns a result string.
-fn load_dict(mut cx: FunctionContext) -> JsResult<JsString> {
-    let mut tokenizer_col_lock = TOKENIZER_COLLECTION.lock().unwrap();
-    let file_path = cx.argument::<JsString>(0)?.value(&mut cx);
-    let dict_name = cx.argument::<JsString>(1)?.value(&mut cx);
-    if tokenizer_col_lock.contains_key(&dict_name) {
-        Ok(cx.string(format!(
-            "Failed: dictionary {} exists, please use another name.",
-            dict_name
-        )))
-    } else {
-        let tokenizer = NewmmTokenizer::new(&file_path);
-        tokenizer_col_lock.insert(dict_name.to_owned(), Box::new(tokenizer));
-
-        Ok(cx.string(format!(
-            "Successful: dictionary name {} from file {} has been successfully loaded.",
-            dict_name, file_path
-        )))
-    }
+// A single TokenizerWrapper can serve many concurrent segment() calls because
+// segment_to_string() takes &self (immutable read).  Create one wrapper,
+// hold its JsBox handle, and reuse it for every call — the dictionary is
+// never copied or reloaded.
+// ---------------------------------------------------------------------------
+struct TokenizerWrapper {
+    inner: Box<dyn Tokenizer>,
 }
 
-// Break text into tokens.
-// Use newmm algorithm.
-// Can use multithreading, but takes a lot of memory.
-// Returns an array of strings.
-fn segment(mut cx: FunctionContext) -> JsResult<JsArray> {
-    let text = cx.argument::<JsString>(0)?.value(&mut cx);
-    let dict_name = cx.argument::<JsString>(1)?.value(&mut cx);
+impl Finalize for TokenizerWrapper {}
+
+// ---------------------------------------------------------------------------
+// Constructor: NewmmTokenizer
+//
+// Args:
+//   0: dict_path (string) — path to a one-word-per-line dictionary file.
+// Returns:
+//   JsBox<TokenizerWrapper>
+// ---------------------------------------------------------------------------
+fn newmm_tokenizer_new(mut cx: FunctionContext) -> JsResult<JsBox<TokenizerWrapper>> {
+    let dict_path = cx.argument::<JsString>(0)?.value(&mut cx);
+    let tok = NewmmTokenizer::new(&dict_path)
+        .or_else(|e| cx.throw_error(format!("error: failed to load dictionary: {}", e)))?;
+    Ok(cx.boxed(TokenizerWrapper {
+        inner: Box::new(tok),
+    }))
+}
+
+// ---------------------------------------------------------------------------
+// Constructor: NewmmFstTokenizer
+//
+// Args:
+//   0: dict_path (string) — path to a one-word-per-line dictionary file.
+// Returns:
+//   JsBox<TokenizerWrapper>
+// ---------------------------------------------------------------------------
+fn newmm_fst_tokenizer_new(mut cx: FunctionContext) -> JsResult<JsBox<TokenizerWrapper>> {
+    let dict_path = cx.argument::<JsString>(0)?.value(&mut cx);
+    let tok = NewmmFstTokenizer::new(&dict_path)
+        .or_else(|e| cx.throw_error(format!("error: failed to load dictionary: {}", e)))?;
+    Ok(cx.boxed(TokenizerWrapper {
+        inner: Box::new(tok),
+    }))
+}
+
+// ---------------------------------------------------------------------------
+// Constructor: DeepcutTokenizer
+//
+// No arguments.  Uses the bundled ONNX model.
+// Returns:
+//   JsBox<TokenizerWrapper>
+// ---------------------------------------------------------------------------
+#[cfg(feature = "deepcut")]
+fn deepcut_tokenizer_new(mut cx: FunctionContext) -> JsResult<JsBox<TokenizerWrapper>> {
+    let tok = DeepcutTokenizer::new()
+        .or_else(|e| cx.throw_error(format!("deepcut: failed to load model: {}", e)))?;
+    Ok(cx.boxed(TokenizerWrapper {
+        inner: Box::new(tok),
+    }))
+}
+
+// ---------------------------------------------------------------------------
+// Shared segment function — works with any TokenizerWrapper handle.
+//
+// Because the tokenizer is read-only after construction, the same handle can
+// be reused for every call — no dictionary copying occurs.
+//
+// Args:
+//   0: handle   (JsBox<TokenizerWrapper>) — from one of the constructor fns.
+//   1: text     (string)
+//   2: safe     (boolean) — enable safe mode (ignored by DeepcutTokenizer).
+//   3: parallel (boolean) — enable parallel mode (ignored by DeepcutTokenizer).
+// Returns:
+//   string[]
+// ---------------------------------------------------------------------------
+fn tokenizer_segment(mut cx: FunctionContext) -> JsResult<JsArray> {
+    let wrapper = cx.argument::<JsBox<TokenizerWrapper>>(0)?;
+    let text = cx.argument::<JsString>(1)?.value(&mut cx);
     let safe = cx.argument::<JsBoolean>(2)?.value(&mut cx);
     let parallel = cx.argument::<JsBoolean>(3)?.value(&mut cx);
-    if let Some(loaded_tokenizer) = TOKENIZER_COLLECTION.lock().unwrap().get(&dict_name) {
-        let result = loaded_tokenizer.segment_to_string(&text, safe, parallel);
-        let js_result_array = JsArray::new(&mut cx, result.len());
-        for (i, obj) in result.iter().enumerate() {
-            let js_string = cx.string(obj);
-            js_result_array.set(&mut cx, i as u32, js_string).unwrap();
+
+    let segments = match wrapper.inner.segment(&text, safe, parallel) {
+        Ok(tokens) => tokens,
+        Err(e) => {
+            return cx.throw_error(format!("tokenizer: failed to segment input: {}", e));
         }
-        Ok(js_result_array)
-    } else {
-        panic!("Dictionary {} does not exist.", dict_name)
+    };
+
+    let js_array = JsArray::new(&mut cx, segments.len());
+    for (i, s) in segments.iter().enumerate() {
+        let js_str = cx.string(s);
+        js_array.set(&mut cx, i as u32, js_str)?;
     }
+    Ok(js_array)
 }
 
+// ---------------------------------------------------------------------------
+// Module registration
+// ---------------------------------------------------------------------------
 #[neon::main]
 fn main(mut cx: ModuleContext) -> NeonResult<()> {
-    cx.export_function("loadDict", load_dict)?;
-    cx.export_function("segment", segment)?;
+    cx.export_function("newmmTokenizerNew", newmm_tokenizer_new)?;
+    cx.export_function("newmmFstTokenizerNew", newmm_fst_tokenizer_new)?;
+    #[cfg(feature = "deepcut")]
+    cx.export_function("deepcutTokenizerNew", deepcut_tokenizer_new)?;
+    cx.export_function("tokenizerSegment", tokenizer_segment)?;
     Ok(())
 }

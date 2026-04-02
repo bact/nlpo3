@@ -33,17 +33,17 @@
 //! ```
 //! HTML reports land in `target/criterion/`.
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use std::hint::black_box;
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use nlpo3::{
     char_string::CharString,
     tokenizer::{
         fst_dict::FstDict,
         newmm::{NewmmFstTokenizer, NewmmTokenizer},
-        trie_char::TrieChar,
         tokenizer_trait::Tokenizer,
+        trie_char::TrieChar,
     },
 };
+use std::hint::black_box;
 
 // ---------------------------------------------------------------------------
 // Shared test fixtures
@@ -107,9 +107,7 @@ fn bench_dict_construction(c: &mut Criterion) {
     });
 
     group.bench_function("FstDict::from_words", |b| {
-        b.iter(|| {
-            black_box(FstDict::from_words(black_box(word_strs.iter().copied())).unwrap())
-        })
+        b.iter(|| black_box(FstDict::from_words(black_box(word_strs.iter().copied())).unwrap()))
     });
 
     group.finish();
@@ -159,8 +157,8 @@ fn bench_prefix_lookup(c: &mut Criterion) {
 
 fn bench_full_tokenization(c: &mut Criterion) {
     let path = dict_path();
-    let tok_trie = NewmmTokenizer::new(&path);
-    let tok_fst = NewmmFstTokenizer::new(&path);
+    let tok_trie = NewmmTokenizer::new(&path).unwrap();
+    let tok_fst = NewmmFstTokenizer::new(&path).unwrap();
 
     #[cfg(feature = "deepcut")]
     let tok_deepcut = nlpo3::tokenizer::deepcut::DeepcutTokenizer::new()
@@ -201,15 +199,9 @@ fn bench_full_tokenization(c: &mut Criterion) {
 
         // DeepcutTokenizer — CNN/ONNX (only with --features deepcut)
         #[cfg(feature = "deepcut")]
-        group.bench_with_input(
-            BenchmarkId::new("DeepcutTokenizer", label),
-            text,
-            |b, t| {
-                b.iter(|| {
-                    black_box(tok_deepcut.segment(black_box(t), false, false).unwrap())
-                })
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("DeepcutTokenizer", label), text, |b, t| {
+            b.iter(|| black_box(tok_deepcut.segment(black_box(t), false, false).unwrap()))
+        });
     }
     group.finish();
 }
@@ -231,10 +223,7 @@ fn bench_memory_footprint(c: &mut Criterion) {
 
     // --- struct stack sizes ---
     eprintln!("Stack sizes:");
-    eprintln!(
-        "  CharString: {} bytes",
-        mem::size_of::<CharString>()
-    );
+    eprintln!("  CharString: {} bytes", mem::size_of::<CharString>());
 
     // --- per-character heap usage ---
     let text = MEDIUM_TEXT;
@@ -284,9 +273,7 @@ fn bench_memory_footprint(c: &mut Criterion) {
         // The model size is constant; read at runtime to avoid embedding the
         // full ONNX blob just for the size query.
         let model_path = format!("{}/model/deepcut.onnx", DICT_PATH);
-        let model_bytes = std::fs::metadata(&model_path)
-            .map(|m| m.len())
-            .unwrap_or(0);
+        let model_bytes = std::fs::metadata(&model_path).map(|m| m.len()).unwrap_or(0);
         eprintln!("\nDeepcutTokenizer:");
         eprintln!("  ONNX model (bundled): {} bytes", model_bytes);
         eprintln!("  No dictionary — model weights are fixed-size.");
@@ -297,11 +284,38 @@ fn bench_memory_footprint(c: &mut Criterion) {
     group.bench_function("CharString::new/overhead", |b| {
         b.iter(|| {
             let cs = CharString::new(black_box(MEDIUM_TEXT));
-            black_box(
-                mem::size_of::<CharString>() + cs.as_str().len() + (cs.chars_len() + 1) * 4,
-            )
+            black_box(mem::size_of::<CharString>() + cs.as_str().len() + (cs.chars_len() + 1) * 4)
         })
     });
+    group.finish();
+}
+
+// ===========================================================================
+// 5. Clone cost — Arc-backed dicts make clone O(1)
+//
+// After the 2.0 Arc migration, cloning a tokenizer is a single atomic
+// reference-count increment rather than a full dictionary copy.  These
+// benchmarks verify the O(1) claim and help catch regressions.
+// ===========================================================================
+
+fn bench_clone_cost(c: &mut Criterion) {
+    let path = dict_path();
+    let tok_trie = NewmmTokenizer::new(&path).unwrap();
+    let tok_fst = NewmmFstTokenizer::new(&path).unwrap();
+
+    let mut group = c.benchmark_group("clone_cost");
+    group.sample_size(200);
+
+    // Cloning a NewmmTokenizer<TrieChar> is O(1) — Arc reference-count bump.
+    group.bench_function("NewmmTokenizer::clone", |b| {
+        b.iter(|| black_box(tok_trie.clone()))
+    });
+
+    // Cloning a NewmmFstTokenizer is O(1) — Arc reference-count bump.
+    group.bench_function("NewmmFstTokenizer::clone", |b| {
+        b.iter(|| black_box(tok_fst.clone()))
+    });
+
     group.finish();
 }
 
@@ -315,5 +329,6 @@ criterion_group!(
     bench_prefix_lookup,
     bench_full_tokenization,
     bench_memory_footprint,
+    bench_clone_cost,
 );
 criterion_main!(benches);

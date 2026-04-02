@@ -17,7 +17,7 @@ fn test_dict_with_empty_line() {
     const DICT_PATH: &str = "/tests/data/dict_with_empty_line.txt";
     let mut relative_dict_path = env!("CARGO_MANIFEST_DIR").to_string();
     relative_dict_path.push_str(DICT_PATH);
-    let _tokenizer = NewmmTokenizer::new(&relative_dict_path);
+    let _tokenizer = NewmmTokenizer::new(&relative_dict_path).unwrap();
 }
 
 #[test]
@@ -175,7 +175,7 @@ fn test_long_text_byte_tokenizer() {
     ]
     .join("");
 
-    let tokenizer = NewmmTokenizer::new(&relative_dict_path);
+    let tokenizer = NewmmTokenizer::new(&relative_dict_path).unwrap();
     let result = tokenizer.segment(&text, false, true).unwrap();
     let safe_result = tokenizer.segment(&text, true, true).unwrap();
     assert_eq!(result.len(), 1889);
@@ -187,7 +187,7 @@ fn test_standard_short_word() {
     let mut relative_dict_path = env!("CARGO_MANIFEST_DIR").to_string();
     relative_dict_path.push_str(DEFAULT_DICT_PATH);
 
-    let tokenizer = NewmmTokenizer::new(&relative_dict_path);
+    let tokenizer = NewmmTokenizer::new(&relative_dict_path).unwrap();
     assert_eq!(
         tokenizer.segment_to_string("1) ประมวลผลภาษาไทย", false, false),
         ["1", ")", " ", "ประมวลผล", "ภาษาไทย"]
@@ -223,7 +223,7 @@ fn test_add_or_remove_word() {
     let mut relative_dict_path = env!("CARGO_MANIFEST_DIR").to_string();
     relative_dict_path.push_str(DEFAULT_DICT_PATH);
 
-    let mut tokenizer = NewmmTokenizer::new(&relative_dict_path);
+    let mut tokenizer = NewmmTokenizer::new(&relative_dict_path).unwrap();
     tokenizer.add_word(&["ห้องสมุดประชาชนเทศบาลตำบลวิชิต"]);
     assert_eq!(
         tokenizer.segment_to_string("ห้องสมุดประชาชนเทศบาลตำบลวิชิต", false, false),
@@ -241,7 +241,7 @@ fn test_with_some_real_data() {
     let mut relative_dict_path = env!("CARGO_MANIFEST_DIR").to_string();
     relative_dict_path.push_str(DEFAULT_DICT_PATH);
 
-    let tokenizer = NewmmTokenizer::new(&relative_dict_path);
+    let tokenizer = NewmmTokenizer::new(&relative_dict_path).unwrap();
     assert_eq!(
         tokenizer.segment_to_string(FIRST_TEXT, false, false),
         ["นิสสัน", "ผ่อน", "จน", "เพลีย", "นาวา", "ร่า", ".."]
@@ -283,7 +283,7 @@ fn test_thai_number() {
     let mut relative_dict_path = env!("CARGO_MANIFEST_DIR").to_string();
     relative_dict_path.push_str(DEFAULT_DICT_PATH);
 
-    let tokenizer = NewmmTokenizer::new(&relative_dict_path);
+    let tokenizer = NewmmTokenizer::new(&relative_dict_path).unwrap();
     assert_eq!(
         tokenizer.segment_to_string("๑๙...", false, false),
         ["๑๙", "..."]
@@ -316,16 +316,20 @@ use nlpo3::tokenizer::newmm::NewmmFstTokenizer;
 fn test_fst_new_and_basic_segment() {
     let mut path = env!("CARGO_MANIFEST_DIR").to_string();
     path.push_str(DEFAULT_DICT_PATH);
-    let tok = NewmmFstTokenizer::new(&path);
+    let tok = NewmmFstTokenizer::new(&path).unwrap();
     let result = tok.segment_to_string(FIRST_TEXT, false, false);
     assert!(!result.is_empty(), "result should not be empty");
-    assert_eq!(result.concat(), FIRST_TEXT, "tokens must reconstruct the input");
+    assert_eq!(
+        result.concat(),
+        FIRST_TEXT,
+        "tokens must reconstruct the input"
+    );
 }
 
 #[test]
 fn test_fst_from_word_list() {
     let words = vec!["สวัสดี".to_string(), "ประเทศ".to_string(), "ไทย".to_string()];
-    let tok = NewmmFstTokenizer::from_word_list(words);
+    let tok = NewmmFstTokenizer::from_word_list(words).unwrap();
     let result = tok.segment_to_string("สวัสดีประเทศไทย", false, false);
     assert_eq!(result.concat(), "สวัสดีประเทศไทย");
 }
@@ -335,8 +339,8 @@ fn test_fst_matches_trie_output() {
     // Both backends must produce identical tokenization for the same input.
     let mut path = env!("CARGO_MANIFEST_DIR").to_string();
     path.push_str(DEFAULT_DICT_PATH);
-    let tok_trie = NewmmTokenizer::new(&path);
-    let tok_fst = NewmmFstTokenizer::new(&path);
+    let tok_trie = NewmmTokenizer::new(&path).unwrap();
+    let tok_fst = NewmmFstTokenizer::new(&path).unwrap();
     for text in &[FIRST_TEXT, SECOND_TEXT] {
         let trie_out = tok_trie.segment_to_string(text, false, false);
         let fst_out = tok_fst.segment_to_string(text, false, false);
@@ -354,8 +358,8 @@ fn test_tokenizer_trait_switchable() {
     use nlpo3::tokenizer::tokenizer_trait::Tokenizer;
     let mut path = env!("CARGO_MANIFEST_DIR").to_string();
     path.push_str(DEFAULT_DICT_PATH);
-    let trie: Box<dyn Tokenizer> = Box::new(NewmmTokenizer::new(&path));
-    let fst: Box<dyn Tokenizer> = Box::new(NewmmFstTokenizer::new(&path));
+    let trie: Box<dyn Tokenizer> = Box::new(NewmmTokenizer::new(&path).unwrap());
+    let fst: Box<dyn Tokenizer> = Box::new(NewmmFstTokenizer::new(&path).unwrap());
     let text = "สวัสดีประเทศไทย";
     assert_eq!(
         trie.segment_to_string(text, false, false),

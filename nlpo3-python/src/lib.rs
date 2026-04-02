@@ -8,157 +8,186 @@
  * Rewrite and extension: PyThaiNLP Project
  */
 use std::path::Path;
-use std::sync::{Mutex, OnceLock};
 
-use ahash::AHashMap as HashMap;
-use lazy_static::lazy_static;
 use nlpo3::tokenizer::deepcut::DeepcutTokenizer;
-use nlpo3::tokenizer::newmm::NewmmTokenizer;
+use nlpo3::tokenizer::newmm::{NewmmFstTokenizer, NewmmTokenizer};
 use nlpo3::tokenizer::tokenizer_trait::Tokenizer;
+use pyo3::exceptions;
 use pyo3::prelude::*;
-use pyo3::types::PyString;
-use pyo3::{exceptions, wrap_pyfunction};
-
-lazy_static! {
-    static ref TOKENIZER_COLLECTION: Mutex<HashMap<String, Box<NewmmTokenizer>>> =
-        Mutex::new(HashMap::new());
-}
-
-/// Process-level lazy singleton used by the `segment_deepcut()` convenience
-/// function.  Stored as `Result` so that a model-load failure yields a Python
-/// `RuntimeError` rather than a panic.
-static DEEPCUT_SINGLETON: OnceLock<Result<DeepcutTokenizer, String>> = OnceLock::new();
-
-fn get_deepcut_singleton() -> PyResult<&'static DeepcutTokenizer> {
-    DEEPCUT_SINGLETON
-        .get_or_init(|| DeepcutTokenizer::new().map_err(|e| e.to_string()))
-        .as_ref()
-        .map_err(|e| {
-            exceptions::PyRuntimeError::new_err(format!("deepcut: model load failed: {}", e))
-        })
-}
-
-/// Load a dictionary file to a tokenizer,
-/// and add that tokenizer to the tokenizer collection.
-///
-/// Dictionary file must one word per line.
-/// If successful, will insert a NewmmTokenizer to TOKENIZER_COLLECTION.
-/// returns a tuple of string of loading result and a boolean
-///
-/// signature: (file_path: str, dict_name: str) -> (str, boolean)
-#[pyfunction]
-#[pyo3(signature = (file_path, dict_name))]
-fn load_dict(file_path: &str, dict_name: &str) -> PyResult<(String, bool)> {
-    let mut tokenizer_col_lock = TOKENIZER_COLLECTION.lock().unwrap();
-    if tokenizer_col_lock.get(dict_name).is_some() {
-        Ok((
-            format!(
-                "Failed: dictionary name {} already exists, please use another name.",
-                dict_name
-            ),
-            false,
-        ))
-    } else {
-        let tokenizer = NewmmTokenizer::new(file_path);
-        tokenizer_col_lock.insert(dict_name.to_owned(), Box::new(tokenizer));
-
-        Ok((
-            format!(
-                "Successful: file {} has been successfully loaded to dictionary name {}.",
-                file_path, dict_name
-            ),
-            true,
-        ))
-    }
-}
-
-/// Break text into tokens.
-/// Use newmm algorithm.
-/// Can use multithreading, but takes a lot of memory.
-/// returns list of valid utf-8 bytes list
-///
-/// signature: (text: str, dict_name: str, safe: boolean = false, parallel: boolean = false) -> List[List[u8]]
-///
-#[pyfunction]
-#[pyo3(signature = (text, dict_name, safe=false, parallel=false))]
-fn segment(
-    text: &Bound<'_, PyString>,
-    dict_name: &str,
-    safe: bool,
-    parallel: bool,
-) -> PyResult<Vec<String>> {
-    if let Some(loaded_tokenizer) = TOKENIZER_COLLECTION.lock().unwrap().get(dict_name) {
-        let result = loaded_tokenizer.segment_to_string(text.to_str()?, safe, parallel);
-        Ok(result)
-    } else {
-        Err(exceptions::PyRuntimeError::new_err(format!(
-            "Dictionary name {} does not exist.",
-            dict_name
-        )))
-    }
-}
-
-/*
-/// Add words to existing dictionary
-#[pyfunction]
-fn add_word(dict_name: &str, words: Vec<&str>) -> PyResult<(String, bool)> {
-    let mut tokenizer_col_lock = TOKENIZER_COLLECTION.lock().unwrap();
-    if let Some(newmm_dict) = tokenizer_col_lock.get(dict_name) {
-        newmm_dict.add_word(&words);
-        Ok((format!("Add new word(s) successfully."), true))
-    } else {
-        Ok((
-            format!(
-                "Cannot add new word(s) - dictionary instance named '{}' does not exist.",
-                dict_name
-            ),
-            false,
-        ))
-    }
-}
-
-/// Remove words from existing dictionary
-#[pyfunction]
-fn remove_word(dict_name: &str, words: Vec<&str>) -> PyResult<(String, bool)> {
-    let mut tokenizer_col_lock = TOKENIZER_COLLECTION.lock().unwrap();
-    if let Some(newmm_dict) = tokenizer_col_lock.get(dict_name) {
-        newmm_dict.remove_word(&words);
-        Ok((format!("Remove word(s) successfully."), true))
-    } else {
-        Ok((
-            format!(
-                "Cannot remove word(s) - dictionary instance named '{}' does not exist.",
-                dict_name
-            ),
-            false,
-        ))
-    }
-}
-*/
 
 // ---------------------------------------------------------------------------
-// Deepcut Python class
+// NewmmTokenizer Python class
 // ---------------------------------------------------------------------------
 
-/// Deepcut CNN-based Thai word tokenizer (Python class).
+/// Dictionary-based maximal-matching Thai word tokenizer.
 ///
-/// Each instance compiles and owns the ONNX model.  Cloning is cheap
-/// (the compiled model is reference-counted).  The same instance is safe to
-/// call from multiple threads simultaneously.
+/// Uses the TrieChar backend (fastest lookup).  The instance is read-only
+/// after construction and safe to call from multiple threads concurrently.
 ///
-/// For distributed or parallel workloads, create one `DeepcutTokenizer` per
-/// worker process to avoid sharing state across process boundaries.
+/// To share one loaded dictionary across many concurrent callers, create a
+/// single instance and hold a reference to it from each caller — no copying
+/// of the dictionary occurs.
 ///
-/// ```python
-/// from nlpo3 import DeepcutTokenizer
+/// Example::
 ///
-/// tokenizer = DeepcutTokenizer()
-/// tokens = tokenizer.segment("ทดสอบการตัดคำ")
+///     from nlpo3 import NewmmTokenizer
 ///
-/// # Load a custom ONNX model from disk
-/// tokenizer = DeepcutTokenizer(model_path="/path/to/custom.onnx")
-/// ```
-#[pyclass(name = "DeepcutTokenizer")]
+///     tok = NewmmTokenizer("path/to/dict.txt")
+///     tokens = tok.segment("สวัสดีครับ")
+///
+///     # safe=True avoids long run times on ambiguous input
+///     tokens = tok.segment("สวัสดีครับ", safe=True)
+///
+///     # parallel=True enables multi-threaded segmentation (higher memory use)
+///     tokens = tok.segment("สวัสดีครับ", parallel=True)
+#[pyclass(name = "NewmmTokenizer", frozen)]
+struct PyNewmmTokenizer {
+    inner: NewmmTokenizer,
+}
+
+#[pymethods]
+impl PyNewmmTokenizer {
+    /// Create a tokenizer from a dictionary file.
+    ///
+    /// Args:
+    ///     dict_path: Path to a plain-text dictionary file (one word per line).
+    #[new]
+    fn new(dict_path: &str) -> PyResult<Self> {
+        NewmmTokenizer::new(dict_path)
+            .map(|inner| PyNewmmTokenizer { inner })
+            .map_err(|e| {
+                exceptions::PyRuntimeError::new_err(format!(
+                    "failed to load dictionary: {}",
+                    e
+                ))
+            })
+    }
+
+    /// Tokenize text into words.
+    ///
+    /// The tokenizer is immutable — the same instance is safe to call from
+    /// multiple threads concurrently without any locking.
+    ///
+    /// Args:
+    ///     text:     Input text to tokenize.
+    ///     safe:     Enable safe mode to avoid long run times on inputs with
+    ///               many ambiguous word boundaries (default: False).
+    ///     parallel: Enable multi-threaded processing (default: False).
+    ///               Uses more memory; benefits long texts on multi-core hosts.
+    ///
+    /// Returns:
+    ///     List of word tokens.
+    ///
+    /// Raises:
+    ///     RuntimeError: If tokenization fails.
+    #[pyo3(signature = (text, safe = false, parallel = false))]
+    fn segment(&self, text: &str, safe: bool, parallel: bool) -> PyResult<Vec<String>> {
+        if text.is_empty() {
+            return Ok(vec![]);
+        }
+        self.inner
+            .segment(text, safe, parallel)
+            .map_err(|e| {
+                exceptions::PyRuntimeError::new_err(format!("segmentation failed: {}", e))
+            })
+    }
+}
+
+// ---------------------------------------------------------------------------
+// NewmmFstTokenizer Python class
+// ---------------------------------------------------------------------------
+
+/// Dictionary-based maximal-matching Thai word tokenizer with FST backend.
+///
+/// Uses the same algorithm as :class:`NewmmTokenizer` but stores the
+/// dictionary in a minimized finite-state automaton (FST), reducing memory
+/// use by ~49× at the cost of slower per-lookup speed.
+///
+/// The instance is read-only after construction and safe to call from
+/// multiple threads concurrently without any locking.
+///
+/// Example::
+///
+///     from nlpo3 import NewmmFstTokenizer
+///
+///     tok = NewmmFstTokenizer("path/to/dict.txt")
+///     tokens = tok.segment("สวัสดีครับ")
+#[pyclass(name = "NewmmFstTokenizer", frozen)]
+struct PyNewmmFstTokenizer {
+    inner: NewmmFstTokenizer,
+}
+
+#[pymethods]
+impl PyNewmmFstTokenizer {
+    /// Create a tokenizer from a dictionary file.
+    ///
+    /// Args:
+    ///     dict_path: Path to a plain-text dictionary file (one word per line).
+    #[new]
+    fn new(dict_path: &str) -> PyResult<Self> {
+        NewmmFstTokenizer::new(dict_path)
+            .map(|inner| PyNewmmFstTokenizer { inner })
+            .map_err(|e| {
+                exceptions::PyRuntimeError::new_err(format!(
+                    "failed to load dictionary: {}",
+                    e
+                ))
+            })
+    }
+
+    /// Tokenize text into words.
+    ///
+    /// The tokenizer is immutable — the same instance is safe to call from
+    /// multiple threads concurrently without any locking.
+    ///
+    /// Args:
+    ///     text:     Input text to tokenize.
+    ///     safe:     Enable safe mode (default: False).
+    ///     parallel: Enable multi-threaded processing (default: False).
+    ///
+    /// Returns:
+    ///     List of word tokens.
+    ///
+    /// Raises:
+    ///     RuntimeError: If tokenization fails.
+    #[pyo3(signature = (text, safe = false, parallel = false))]
+    fn segment(&self, text: &str, safe: bool, parallel: bool) -> PyResult<Vec<String>> {
+        if text.is_empty() {
+            return Ok(vec![]);
+        }
+        self.inner
+            .segment(text, safe, parallel)
+            .map_err(|e| {
+                exceptions::PyRuntimeError::new_err(format!("tokenization failed: {}", e))
+            })
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DeepcutTokenizer Python class
+// ---------------------------------------------------------------------------
+
+/// Deepcut CNN-based Thai word tokenizer.
+///
+/// Each instance compiles and owns the ONNX model.  Internally the compiled
+/// model is reference-counted (:class:`Arc`), so cloning is O(1).  The same
+/// instance is safe to call from multiple threads simultaneously.
+///
+/// For distributed or parallel workloads, create one instance per worker
+/// process to avoid sharing state across process boundaries.
+///
+/// Example::
+///
+///     from nlpo3 import DeepcutTokenizer
+///
+///     # Use the bundled default model
+///     tok = DeepcutTokenizer()
+///     tokens = tok.segment("สวัสดีครับ")
+///
+///     # Use a custom ONNX model file
+///     tok = DeepcutTokenizer(model_path="/path/to/custom.onnx")
+///     tokens = tok.segment("สวัสดีครับ")
+#[pyclass(name = "DeepcutTokenizer", frozen)]
 struct PyDeepcutTokenizer {
     inner: DeepcutTokenizer,
 }
@@ -169,8 +198,15 @@ impl PyDeepcutTokenizer {
     ///
     /// If ``model_path`` is ``None`` (the default), the bundled ONNX model is
     /// used.  Pass a filesystem path to load a custom compatible model.
+    ///
+    /// Args:
+    ///     model_path: Path to a custom deepcut ONNX model file, or ``None``
+    ///                 to use the bundled default model.
+    ///
+    /// Raises:
+    ///     RuntimeError: If the ONNX model cannot be loaded.
     #[new]
-    #[pyo3(signature = (model_path=None))]
+    #[pyo3(signature = (model_path = None))]
     fn new(model_path: Option<&str>) -> PyResult<Self> {
         let result = match model_path {
             None => DeepcutTokenizer::new(),
@@ -180,57 +216,43 @@ impl PyDeepcutTokenizer {
             .map(|inner| PyDeepcutTokenizer { inner })
             .map_err(|e| {
                 exceptions::PyRuntimeError::new_err(format!(
-                    "deepcut: failed to create tokenizer: {}",
+                    "deepcut: failed to load tokenizer: {}",
                     e
                 ))
             })
     }
 
-    /// Break text into tokens using the deepcut CNN model.
+    /// Tokenize text using the deepcut CNN model.
     ///
-    /// Thread-safe: multiple threads may call this on the same instance.
+    /// Inference is thread-safe: the same instance may be called concurrently
+    /// from multiple threads.
+    ///
+    /// Args:
+    ///     text: Input text to tokenize.
+    ///
+    /// Returns:
+    ///     List of word tokens.
+    ///
+    /// Raises:
+    ///     RuntimeError: If ONNX inference fails.
     fn segment(&self, text: &str) -> PyResult<Vec<String>> {
         if text.is_empty() {
             return Ok(vec![]);
         }
         self.inner.tokenize(text).map_err(|e| {
-            exceptions::PyRuntimeError::new_err(format!("deepcut inference failed: {}", e))
+            exceptions::PyRuntimeError::new_err(format!("deepcut: inference failed: {}", e))
         })
     }
 }
 
 // ---------------------------------------------------------------------------
-// Deepcut convenience function
+// Module
 // ---------------------------------------------------------------------------
-
-/// Break text into tokens using the deepcut CNN model (ONNX inference).
-///
-/// Uses a process-level lazy singleton for the bundled model.  The singleton
-/// is initialised once on the first call and is safe for concurrent use.
-/// A model-load failure returns a `RuntimeError` instead of panicking.
-///
-/// For distributed or parallel workloads where each worker should own its
-/// model, use `DeepcutTokenizer` directly instead.
-///
-/// signature: (text: str) -> List[str]
-#[pyfunction]
-#[pyo3(signature = (text))]
-fn segment_deepcut(text: &str) -> PyResult<Vec<String>> {
-    if text.is_empty() {
-        return Ok(vec![]);
-    }
-    get_deepcut_singleton()?
-        .tokenize(text)
-        .map_err(|e| {
-            exceptions::PyRuntimeError::new_err(format!("deepcut inference failed: {}", e))
-        })
-}
 
 #[pymodule]
 fn _nlpo3_python_backend(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(load_dict, m)?)?;
-    m.add_function(wrap_pyfunction!(segment, m)?)?;
-    m.add_function(wrap_pyfunction!(segment_deepcut, m)?)?;
+    m.add_class::<PyNewmmTokenizer>()?;
+    m.add_class::<PyNewmmFstTokenizer>()?;
     m.add_class::<PyDeepcutTokenizer>()?;
     Ok(())
 }

@@ -3,14 +3,127 @@
 
 """Type stubs for _nlpo3_python_backend Rust extension module."""
 
-from typing import List, Optional, Tuple
+from __future__ import annotations
+
+from typing import List, Optional
+
+class NewmmTokenizer:
+    """Dictionary-based maximal-matching Thai word tokenizer.
+
+    Uses the TrieChar backend (fastest lookup).  The instance is read-only
+    after construction and safe to call from multiple threads concurrently.
+
+    To share one loaded dictionary across many concurrent callers, create a
+    single instance and hold a reference to it from each caller — no copying
+    of the dictionary occurs.
+
+    Example::
+
+        from nlpo3 import NewmmTokenizer
+
+        tok = NewmmTokenizer("path/to/dict.txt")
+        tokens = tok.segment("สวัสดีครับ")
+
+        # Reuse the same instance across all concurrent callers
+        results = [tok.segment(t) for t in texts]
+    """
+
+    def __new__(cls, dict_path: str) -> "NewmmTokenizer":
+        """Create a tokenizer from a dictionary file.
+
+        Args:
+            dict_path: Path to a plain-text dictionary file (one word per line).
+
+        Raises:
+            RuntimeError: If the dictionary file cannot be read or parsed.
+        """
+        ...
+
+    def segment(
+        self,
+        text: str,
+        safe: bool = False,
+        parallel: bool = False,
+    ) -> List[str]:
+        """Tokenize text into words.
+
+        The tokenizer is immutable — the same instance is safe to call from
+        multiple threads concurrently without any locking.
+
+        Args:
+            text:     Input text to tokenize.
+            safe:     Enable safe mode to avoid long run times on inputs with
+                      many ambiguous word boundaries (default: False).
+            parallel: Enable multi-threaded processing (default: False).
+                      Uses more memory; benefits long texts on multi-core hosts.
+
+        Returns:
+            List of word tokens.
+
+        Raises:
+            RuntimeError: If tokenization fails.
+        """
+        ...
+
+class NewmmFstTokenizer:
+    """Dictionary-based maximal-matching Thai word tokenizer (FST backend).
+
+    Uses the same algorithm as :class:`NewmmTokenizer` but stores the
+    dictionary in a minimized finite-state automaton, reducing memory use by
+    ~49× at the cost of slower per-lookup speed.
+
+    The instance is read-only after construction and safe to call from
+    multiple threads concurrently without any locking.
+
+    Example::
+
+        from nlpo3 import NewmmFstTokenizer
+
+        tok = NewmmFstTokenizer("path/to/dict.txt")
+        tokens = tok.segment("สวัสดีครับ")
+    """
+
+    def __new__(cls, dict_path: str) -> "NewmmFstTokenizer":
+        """Create a tokenizer from a dictionary file.
+
+        Args:
+            dict_path: Path to a plain-text dictionary file (one word per line).
+
+        Raises:
+            RuntimeError: If the dictionary file cannot be read or parsed.
+        """
+        ...
+
+    def segment(
+        self,
+        text: str,
+        safe: bool = False,
+        parallel: bool = False,
+    ) -> List[str]:
+        """Tokenize text into words.
+
+        The tokenizer is immutable — the same instance is safe to call from
+        multiple threads concurrently without any locking.
+
+        Args:
+            text:     Input text to tokenize.
+            safe:     Enable safe mode (default: False).
+            parallel: Enable multi-threaded processing (default: False).
+
+        Returns:
+            List of word tokens.
+
+        Raises:
+            RuntimeError: If tokenization fails.
+        """
+        ...
 
 class DeepcutTokenizer:
-    """Deepcut CNN-based Thai word tokenizer (Rust backend).
+    """Deepcut CNN-based Thai word tokenizer.
 
-    Each instance compiles and owns the ONNX model.  Cloning is cheap
-    (the compiled model is reference-counted).  The same instance is safe
-    to call from multiple threads simultaneously.
+    Each instance compiles and owns the ONNX model.  Internally the compiled
+    model is reference-counted (Arc), so cloning is O(1).  The same instance
+    is safe to call from multiple threads simultaneously.
 
     For distributed or parallel workloads, create one instance per worker
     process to avoid sharing state across process boundaries.
@@ -20,81 +133,40 @@ class DeepcutTokenizer:
         from nlpo3 import DeepcutTokenizer
 
         # Bundled model
-        tokenizer = DeepcutTokenizer()
-        tokens = tokenizer.segment("ทดสอบการตัดคำ")
+        tok = DeepcutTokenizer()
+        tokens = tok.segment("สวัสดีครับ")
 
-        # Custom model from disk
-        tokenizer = DeepcutTokenizer(model_path="/path/to/custom.onnx")
+        # Custom ONNX model
+        tok = DeepcutTokenizer(model_path="/path/to/custom.onnx")
     """
 
-    def __new__(cls, model_path: Optional[str] = None) -> "DeepcutTokenizer": ...
-    def segment(self, text: str) -> List[str]:
-        """Break text into tokens using the deepcut CNN model.
-
-        Thread-safe: multiple threads may call this on the same instance.
+    def __new__(
+        cls, model_path: Optional[str] = None
+    ) -> "DeepcutTokenizer":
+        """Create a DeepcutTokenizer.
 
         Args:
-            text: Input text to segment
+            model_path: Path to a custom deepcut ONNX model file, or ``None``
+                        to use the bundled default model.
 
-        Returns:
-            List of tokens
+        Raises:
+            RuntimeError: If the ONNX model cannot be loaded.
         """
         ...
 
-def load_dict(file_path: str, dict_name: str) -> Tuple[str, bool]:
-    """Load a dictionary file to a tokenizer.
+    def segment(self, text: str) -> List[str]:
+        """Tokenize text using the deepcut CNN model.
 
-    Load a dictionary file into an in-memory dictionary collection,
-    and assign dict_name to it. This function does not override an
-    existing dict name.
+        Inference is thread-safe: the same instance may be called concurrently
+        from multiple threads.
 
-    Args:
-        file_path: Path to a dictionary file (one word per line)
-        dict_name: A unique dictionary name, used for reference
+        Args:
+            text: Input text to tokenize.
 
-    Returns:
-        A tuple of (human_readable_result_str, success_bool)
-    """
-    ...
+        Returns:
+            List of word tokens.
 
-def segment(
-    text: str,
-    dict_name: str,
-    safe: bool = False,
-    parallel: bool = False,
-) -> List[str]:
-    """Break text into tokens using newmm algorithm.
-
-    Args:
-        text: Input text to segment
-        dict_name: Dictionary name, as assigned in load_dict()
-        safe: Use safe mode to avoid long waiting time in a text with
-              lots of ambiguous word boundaries (default: False)
-        parallel: Use multithread mode (default: False)
-
-    Returns:
-        List of tokens
-
-    Raises:
-        RuntimeError: If dictionary name does not exist
-    """
-    ...
-
-def segment_deepcut(text: str) -> List[str]:
-    """Break text into tokens using the deepcut CNN model.
-
-    Uses a process-level lazy singleton for the bundled model.  The
-    singleton is initialised once on first call; a model-load failure
-    raises RuntimeError instead of panicking.  For distributed or
-    parallel workloads, use DeepcutTokenizer directly.
-
-    Args:
-        text: Input text to segment
-
-    Returns:
-        List of tokens
-
-    Raises:
-        RuntimeError: If model load or ONNX inference fails
-    """
-    ...
+        Raises:
+            RuntimeError: If ONNX inference fails.
+        """
+        ...
