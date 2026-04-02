@@ -278,6 +278,12 @@ impl<D: DictBackend> NewmmTokenizer<D> {
     ) -> AnyResult<Vec<CharacterIndex>> {
         current_queue.clear();
 
+        // The visited set prevents re-exploring nodes already reached via a
+        // shorter path, converting worst-case BFS from O(2^n) to O(V + E).
+        let mut visited: HashSet<CharacterIndex> =
+            HashSet::with_capacity_and_hasher(goal - start, Default::default());
+        visited.insert(start);
+
         let mut init_path: Vec<usize> = Vec::with_capacity(goal - start);
         init_path.push(start);
         current_queue.push_back((start, init_path));
@@ -285,15 +291,16 @@ impl<D: DictBackend> NewmmTokenizer<D> {
         while let Some((vertex, path)) = current_queue.pop_front() {
             if let Some(idk) = graph.get(&vertex) {
                 for &position in idk {
-                    if position != goal {
-                        let mut appended_path = path.clone();
-                        appended_path.push(position);
-                        current_queue.push_back((position, appended_path));
-                    } else {
+                    if position == goal {
                         let mut appended_path = path;
                         appended_path.push(position);
                         return Ok(appended_path);
-                    };
+                    } else if !visited.contains(&position) {
+                        visited.insert(position);
+                        let mut appended_path = path.clone();
+                        appended_path.push(position);
+                        current_queue.push_back((position, appended_path));
+                    }
                 }
             };
         }
@@ -354,7 +361,8 @@ impl<D: DictBackend> NewmmTokenizer<D> {
                         first_position_list,
                         &mut reused_queue,
                     )?;
-                    graph_size = 0; // reset graph
+                    graph_size = 0;
+                    graph.clear();
 
                     for &position in group_of_end_position_candidate.iter().skip(1) {
                         let token = text.substring_as_str(end_position, position);
@@ -421,11 +429,8 @@ impl<D: DictBackend> NewmmTokenizer<D> {
                     }
                 }
 
-                graph
-                    .entry(begin_position)
-                    .or_insert_with(|| Vec::with_capacity(10))
-                    .push(end_position);
-                graph_size += 1;
+                graph_size = 0;
+                graph.clear();
                 let token = text.substring_as_str(begin_position, end_position);
                 result_str.push(token);
                 position_list.push(end_position);

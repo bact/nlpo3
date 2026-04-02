@@ -12,6 +12,25 @@ conventions. Version numbers follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- `src/tokenizer/newmm.rs`: Resolved exponential BFS path explosion in
+  `bfs_paths_graph`. Added a `visited` set to prevent re-exploring nodes
+  already reached, reducing worst-case complexity from O(2^n) to O(V + E).
+  Mirrors the fix in
+  [PyThaiNLP/pythainlp#1319](https://github.com/PyThaiNLP/pythainlp/pull/1319).
+- `src/tokenizer/newmm.rs`: Clear the ambiguity graph after each commit point
+  in `one_cut` to prevent unbounded edge accumulation across segments.
+- `src/tokenizer/newmm.rs`: Remove the unnecessary graph edge insertion in the
+  no-candidate branch of `one_cut`; the graph is now cleared there instead,
+  consistent with the commit-point branch.
+
+### Added
+
+- `tests/test_tokenizer.rs`: Added `test_newmm_ambiguous_performance` regression
+  test that verifies tokenization of highly ambiguous input completes within
+  one second.
+
 ## [2.0.0] - 2026-04-01
 
 ### Added
