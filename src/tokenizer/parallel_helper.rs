@@ -131,7 +131,18 @@ fn find_best_break_point(
     let search_end_byte = clamp_to_char_boundary_right(text, raw_search_end_byte);
 
     if search_start_byte >= search_end_byte {
-        return target_end;
+        let end = target_end.min(index.char_count());
+        if let Some(pos) = find_prev_break_in_range(sorted_tcc_positions, start, end) {
+            return pos;
+        }
+        if let Some(pos) = find_next_break_in_range(
+            sorted_tcc_positions,
+            end.saturating_add(1),
+            index.char_count(),
+        ) {
+            return pos;
+        }
+        return start;
     }
 
     let search_range = &text[search_start_byte..search_end_byte];

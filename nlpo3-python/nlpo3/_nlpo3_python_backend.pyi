@@ -153,7 +153,9 @@ class DeepcutTokenizer:
         """
         ...
 
-    def segment(self, text: str, parallel_chunk_size: Optional[int] = None) -> List[str]:
+    def segment(
+        self, text: str, parallel_chunk_size: Optional[int] = None
+    ) -> List[str]:
         """Tokenize text using the deepcut CNN model.
 
         Inference is thread-safe: the same instance may be called concurrently
