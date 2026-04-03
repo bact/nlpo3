@@ -46,7 +46,7 @@ echo "ฉันกินข้าว" | nlpo3 segment
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `--safe` | flag | off | Avoid long run times on inputs with many ambiguous word boundaries |
-| `--parallell [CHUNK_SIZE]` | optional integer | `65536` (when flag is set without value) | Enable chunked parallel processing; if no value is provided, uses 65536 bytes |
+| `--parallel [CHUNK_SIZE]` | optional integer | `65536` (when flag is set without value) | Enable chunked parallel processing; if no value is provided, uses 65536 bytes |
 
 Other useful segment flags:
 
@@ -97,8 +97,8 @@ echo "ฉันกินข้าว" | nlpo3 segment --safe
 Enable parallel processing for larger text:
 
 ```bash
-echo "ฉันกินข้าว" | nlpo3 segment --parallell
-echo "ฉันกินข้าว" | nlpo3 segment --parallell 16384
+echo "ฉันกินข้าว" | nlpo3 segment -p
+echo "ฉันกินข้าว" | nlpo3 segment -p 16384
 ```
 
 ## Support

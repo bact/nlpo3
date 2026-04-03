@@ -39,7 +39,7 @@ use nlpo3::{
     tokenizer::{
         fst_dict::FstDict,
         newmm::{NewmmFstTokenizer, NewmmTokenizer},
-        tokenizer_trait::Tokenizer,
+        parallel_options::ParallelOptions,
         trie_char::TrieChar,
     },
 };
@@ -335,10 +335,85 @@ fn bench_clone_cost(c: &mut Criterion) {
     group.finish();
 }
 
+// ===========================================================================
+// 6. Deepcut chunking overhead
+//
+// Isolates the cost of chunk management by comparing:
+// - no chunking (parallel disabled)
+// - chunking enabled but sequential tokenization
+// - chunking enabled with parallel tokenization
+// ===========================================================================
+
+#[cfg(feature = "deepcut")]
+fn bench_deepcut_chunking_overhead(c: &mut Criterion) {
+    use std::time::Duration;
+
+    let tok = nlpo3::tokenizer::deepcut::DeepcutTokenizer::new()
+        .expect("deepcut: ONNX model failed to load");
+
+    // Ensure input is large enough to cross chunk thresholds.
+    let huge_text = LONG_TEXT.repeat(240);
+    let len = huge_text.len();
+    let seq_chunk_size = len.saturating_sub(1).max(ParallelOptions::MIN_CHUNK_SIZE);
+
+    let mut group = c.benchmark_group("deepcut_chunking_overhead");
+    group.sample_size(10);
+    group.measurement_time(Duration::from_secs(8));
+    group.throughput(Throughput::Bytes(len as u64));
+
+    group.bench_with_input(
+        BenchmarkId::new("chunking", "disabled"),
+        &huge_text,
+        |b, t| b.iter(|| black_box(tok.segment_with_options(black_box(t), None).unwrap())),
+    );
+
+    // Chunking path is taken, but should_parallelize() stays false.
+    group.bench_with_input(
+        BenchmarkId::new("chunking", "enabled-sequential"),
+        &huge_text,
+        |b, t| {
+            b.iter(|| {
+                black_box(
+                    tok.segment_with_options(black_box(t), Some(seq_chunk_size))
+                        .unwrap(),
+                )
+            })
+        },
+    );
+
+    // Chunking path with parallel tokenization.
+    group.bench_with_input(
+        BenchmarkId::new("chunking", "enabled-parallel"),
+        &huge_text,
+        |b, t| {
+            b.iter(|| {
+                black_box(
+                    tok.segment_with_options(black_box(t), Some(ParallelOptions::MIN_CHUNK_SIZE))
+                        .unwrap(),
+                )
+            })
+        },
+    );
+
+    group.finish();
+}
+
 // ---------------------------------------------------------------------------
 // Register all benchmark groups
 // ---------------------------------------------------------------------------
 
+#[cfg(feature = "deepcut")]
+criterion_group!(
+    benches,
+    bench_dict_construction,
+    bench_prefix_lookup,
+    bench_full_tokenization,
+    bench_memory_footprint,
+    bench_clone_cost,
+    bench_deepcut_chunking_overhead,
+);
+
+#[cfg(not(feature = "deepcut"))]
 criterion_group!(
     benches,
     bench_dict_construction,

@@ -74,7 +74,7 @@ struct SegmentOpts {
     /// a value, the default chunk size is used.
     #[arg(
         short = 'p',
-        long = "parallell",
+        long = "parallel",
         num_args = 0..=1,
         default_missing_value = DEFAULT_PARALLEL_CHUNK_SIZE_STR
     )]

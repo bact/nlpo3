@@ -12,6 +12,38 @@ use rustc_hash::FxHashSet;
 /// Context window to search for good break points around the target split location.
 const BREAK_SEARCH_WINDOW: usize = 100;
 
+/// Precomputed character/byte position index for a UTF-8 string.
+struct TextIndex {
+    char_to_byte: Vec<usize>,
+    byte_len: usize,
+}
+
+impl TextIndex {
+    fn new(text: &str) -> Self {
+        let mut char_to_byte: Vec<usize> = text.char_indices().map(|(i, _)| i).collect();
+        char_to_byte.push(text.len());
+        Self {
+            char_to_byte,
+            byte_len: text.len(),
+        }
+    }
+
+    fn char_count(&self) -> usize {
+        self.char_to_byte.len().saturating_sub(1)
+    }
+
+    fn char_to_byte(&self, char_index: usize) -> usize {
+        self.char_to_byte[char_index.min(self.char_count())]
+    }
+
+    fn byte_to_char(&self, byte_offset: usize) -> Option<usize> {
+        if byte_offset > self.byte_len {
+            return None;
+        }
+        self.char_to_byte.binary_search(&byte_offset).ok()
+    }
+}
+
 /// Split text into chunks for parallel processing.
 ///
 /// Chunks respect Thai Character Cluster (TCC) boundaries and prefer breaking at:
@@ -31,19 +63,29 @@ pub fn split_text_into_chunks<'a>(
     if text.len() <= target_chunk_size {
         return vec![text];
     }
-    let char_count = text.chars().count();
-    let mut chunks = Vec::new();
+    let index = TextIndex::new(text);
+    let char_count = index.char_count();
+    let est_chunks = text.len().div_ceil(target_chunk_size).max(1);
+    let mut chunks = Vec::with_capacity(est_chunks);
+    let mut sorted_break_points: Vec<usize> = valid_break_points.iter().copied().collect();
+    sorted_break_points.sort_unstable();
     let mut start: usize = 0; // character index
     while start < char_count {
         let target_end = start + (target_chunk_size / 4); // rough estimate: ~4 bytes per Thai char
         let target_end = target_end.min(char_count);
         // Find the best break point near the target
-        let break_pos =
-            find_best_break_point(text, start, target_end, valid_break_points, char_count);
+        let break_pos = find_best_break_point(
+            text,
+            &index,
+            start,
+            target_end,
+            valid_break_points,
+            &sorted_break_points,
+        );
         // Extract chunk from start to break_pos (in byte offsets)
         if break_pos > start {
-            let start_byte = char_index_to_byte_offset(text, start);
-            let break_byte = char_index_to_byte_offset(text, break_pos);
+            let start_byte = index.char_to_byte(start);
+            let break_byte = index.char_to_byte(break_pos);
             chunks.push(&text[start_byte..break_byte]);
             start = break_pos;
         } else {
@@ -63,13 +105,14 @@ pub fn split_text_into_chunks<'a>(
 /// 4. Fallback: the target position if no better option
 fn find_best_break_point(
     text: &str,
+    index: &TextIndex,
     start: usize,
     target_end: usize,
     tcc_positions: &FxHashSet<usize>,
-    _char_count: usize,
+    sorted_tcc_positions: &[usize],
 ) -> usize {
-    let start_byte = char_index_to_byte_offset(text, start);
-    let target_byte = char_index_to_byte_offset(text, target_end.min(text.chars().count()));
+    let start_byte = index.char_to_byte(start);
+    let target_byte = index.char_to_byte(target_end.min(index.char_count()));
 
     // Define the search range: around the target position
     let raw_search_start_byte = if target_byte > BREAK_SEARCH_WINDOW {
@@ -96,7 +139,7 @@ fn find_best_break_point(
         // Prefer a space after punctuation if available
         if let Some(after) = punct_pos.checked_add(get_char_at_offset(text, punct_pos).len_utf8()) {
             if after < text.len() && text[after..].starts_with(' ') {
-                if let Some(char_idx) = byte_offset_to_char_index(text, after + 1) {
+                if let Some(char_idx) = index.byte_to_char(after + 1) {
                     if tcc_positions.contains(&char_idx) {
                         return char_idx;
                     }
@@ -104,7 +147,7 @@ fn find_best_break_point(
             }
         }
         // Fallback to just after the punctuation
-        if let Some(char_idx) = byte_offset_to_char_index(text, punct_pos) {
+        if let Some(char_idx) = index.byte_to_char(punct_pos) {
             if let Some(next_idx) = char_idx.checked_add(1) {
                 if tcc_positions.contains(&next_idx) {
                     return next_idx;
@@ -116,8 +159,7 @@ fn find_best_break_point(
     // Look for whitespace breaks (priority: high)
     if let Some(idx) = search_range.rfind(|c: char| c.is_whitespace()) {
         let space_byte = search_start_byte + idx;
-        if let Some(char_idx) = byte_offset_to_char_index(
-            text,
+        if let Some(char_idx) = index.byte_to_char(
             space_byte.saturating_add(get_char_at_offset(text, space_byte).len_utf8()),
         ) {
             if tcc_positions.contains(&char_idx) {
@@ -127,26 +169,34 @@ fn find_best_break_point(
     }
 
     // Fall back to nearest TCC position within search range
-    for pos in (start..=target_end.min(text.chars().count())).rev() {
-        if tcc_positions.contains(&pos) {
-            return pos;
-        }
+    if let Some(pos) = find_prev_break_in_range(
+        sorted_tcc_positions,
+        start,
+        target_end.min(index.char_count()),
+    ) {
+        return pos;
     }
 
     best_pos
 }
 
-/// Convert a character index to a byte offset in the text.
-fn char_index_to_byte_offset(text: &str, char_index: usize) -> usize {
-    text.chars().take(char_index).map(|c| c.len_utf8()).sum()
-}
-
-/// Convert a byte offset to a character index, if valid.
-fn byte_offset_to_char_index(text: &str, byte_offset: usize) -> Option<usize> {
-    if byte_offset > text.len() {
+/// Find the largest break point within [start, end].
+fn find_prev_break_in_range(sorted_points: &[usize], start: usize, end: usize) -> Option<usize> {
+    if sorted_points.is_empty() || start > end {
         return None;
     }
-    Some(text[..byte_offset].chars().count())
+
+    let insertion = sorted_points.partition_point(|&p| p <= end);
+    if insertion == 0 {
+        return None;
+    }
+
+    let candidate = sorted_points[insertion - 1];
+    if candidate >= start {
+        Some(candidate)
+    } else {
+        None
+    }
 }
 
 /// Get the character at a byte offset.
@@ -193,7 +243,12 @@ where
 
 /// Flatten a vector of token vectors into a single vector.
 pub fn flatten_tokens(token_vecs: Vec<Vec<String>>) -> Vec<String> {
-    token_vecs.into_iter().flatten().collect()
+    let total = token_vecs.iter().map(Vec::len).sum();
+    let mut out = Vec::with_capacity(total);
+    for mut chunk in token_vecs {
+        out.append(&mut chunk);
+    }
+    out
 }
 
 #[cfg(test)]
@@ -227,5 +282,24 @@ mod tests {
 
         let rebuilt = chunks.concat();
         assert_eq!(rebuilt, text);
+    }
+
+    #[test]
+    fn test_text_index_roundtrip() {
+        let text = "abcกขค";
+        let idx = TextIndex::new(text);
+
+        for char_idx in 0..=idx.char_count() {
+            let byte = idx.char_to_byte(char_idx);
+            assert_eq!(idx.byte_to_char(byte), Some(char_idx));
+        }
+    }
+
+    #[test]
+    fn test_find_prev_break_in_range() {
+        let sorted = vec![0, 4, 8, 12, 16];
+        assert_eq!(find_prev_break_in_range(&sorted, 5, 11), Some(8));
+        assert_eq!(find_prev_break_in_range(&sorted, 13, 15), None);
+        assert_eq!(find_prev_break_in_range(&sorted, 0, 2), Some(0));
     }
 }
