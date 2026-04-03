@@ -64,8 +64,12 @@ jobs:
       - name: Build wheel
         run: |
           pip install -U pip
-          pip install -U build setuptools setuptools-rust wheel
+          pip install -U build setuptools setuptools-rust twine wheel
           python -m build --wheel
+
+      - name: Check wheel metadata
+        run: python -m twine check dist/*
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.14'
 
       - name: Install wheel
         run: pip install --no-index --find-links=dist nlpo3
