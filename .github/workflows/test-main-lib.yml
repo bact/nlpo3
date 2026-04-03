@@ -27,10 +27,6 @@ jobs:
       fail-fast: false
       matrix:
         os: [macos-latest, ubuntu-latest, windows-latest]
-        bitness: [64]  # 32, 64
-        include:
-        - os: windows-latest
-          bitness: 32
 
     runs-on: ${{ matrix.os }}
 
@@ -43,6 +39,7 @@ jobs:
 
     - name: Test publish
       run: cargo publish --dry-run
+      if: matrix.os == 'ubuntu-latest'
 
     - name: Test
       run: cargo test

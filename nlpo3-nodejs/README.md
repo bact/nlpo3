@@ -29,7 +29,9 @@ npm i nlpo3-nodejs
 
 ## Requirements
 
-- Node.js 24 or newer
+- Node.js 22 or newer
+
+Tested in CI on Node.js 22.x, 24.x, and `current`.
 
 ## Quick start
 

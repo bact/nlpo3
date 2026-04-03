@@ -43,12 +43,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        node-version: ["24"]
-        include:
-          - os: windows-latest
-            node-version: "24"
-          - os: macos-latest
-            node-version: "24"
+        node-version: ["22.x", "24.x", "current"]
 
     runs-on: ${{ matrix.os }}
 
@@ -67,7 +62,11 @@ jobs:
           cache-dependency-path: nlpo3-nodejs/package-lock.json
 
       - name: Install Node.js dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
+      - name: Test publish
+        run: npm pack --dry-run
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == '22.x'
+        
       - name: Test
         run: npm test

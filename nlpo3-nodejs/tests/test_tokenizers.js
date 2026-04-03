@@ -11,6 +11,7 @@
  *   node --test tests/test_tokenizers.js
  *
  * Uses Node.js built-in test runner (node:test, available since Node 18).
+ * This package supports Node.js 22 and newer.
  */
 
 const assert = require("node:assert/strict");
@@ -20,6 +21,11 @@ const path = require("node:path");
 const { NewmmTokenizer, NewmmFstTokenizer, DeepcutTokenizer } = require("../nlpo3/index.js");
 
 const DICT_PATH = path.join(__dirname, "data", "test_dict.txt");
+
+test("runtime version is supported", () => {
+    const major = Number(process.versions.node.split(".")[0]);
+    assert.ok(Number.isInteger(major) && major >= 22, "Node.js 22+ is required");
+});
 
 // ---------------------------------------------------------------------------
 // NewmmTokenizer

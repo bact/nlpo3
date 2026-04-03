@@ -1,5 +1,6 @@
 nlpo3/*.node
 nlpo3/index.js
+nlpo3/index.d.ts
 
 # Logs
 logs
