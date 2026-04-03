@@ -59,18 +59,49 @@ pub fn split_text_into_chunks<'a>(
     target_chunk_size: usize,
     valid_break_points: &[usize],
 ) -> Vec<&'a str> {
+    let index = TextIndex::new(text);
+    split_text_into_chunk_ranges_with_index(text, &index, target_chunk_size, valid_break_points)
+        .into_iter()
+        .map(|(start, end)| {
+            let start_byte = index.char_to_byte(start);
+            let end_byte = index.char_to_byte(end);
+            &text[start_byte..end_byte]
+        })
+        .collect()
+}
+
+/// Split text into character-index ranges for parallel processing.
+///
+/// Each returned tuple is `(start_char, end_char)` and always aligned to
+/// valid UTF-8 character boundaries and TCC-aware break points.
+pub fn split_text_into_chunk_ranges(
+    text: &str,
+    target_chunk_size: usize,
+    valid_break_points: &[usize],
+) -> Vec<(usize, usize)> {
+    let index = TextIndex::new(text);
+    split_text_into_chunk_ranges_with_index(text, &index, target_chunk_size, valid_break_points)
+}
+
+fn split_text_into_chunk_ranges_with_index(
+    text: &str,
+    index: &TextIndex,
+    target_chunk_size: usize,
+    valid_break_points: &[usize],
+) -> Vec<(usize, usize)> {
     debug_assert!(valid_break_points.windows(2).all(|w| w[0] <= w[1]));
 
+    let char_count = index.char_count();
+
     if target_chunk_size == 0 {
-        return vec![text];
+        return vec![(0, char_count)];
     }
     if text.len() <= target_chunk_size {
-        return vec![text];
+        return vec![(0, char_count)];
     }
-    let index = TextIndex::new(text);
-    let char_count = index.char_count();
+
     let est_chunks = text.len().div_ceil(target_chunk_size).max(1);
-    let mut chunks = Vec::with_capacity(est_chunks);
+    let mut chunks: Vec<(usize, usize)> = Vec::with_capacity(est_chunks);
     let mut start: usize = 0; // character index
     while start < char_count {
         let start_byte = index.char_to_byte(start);
@@ -81,18 +112,14 @@ pub fn split_text_into_chunks<'a>(
         let break_pos = find_best_break_point(text, &index, start, target_end, valid_break_points);
         // Extract chunk from start to break_pos (in byte offsets)
         if break_pos > start {
-            let start_byte = index.char_to_byte(start);
-            let break_byte = index.char_to_byte(break_pos);
-            chunks.push(&text[start_byte..break_byte]);
+            chunks.push((start, break_pos));
             start = break_pos;
         } else {
             // Fallback: preserve text and make forward progress.
             let fallback_break_pos =
                 find_next_break_in_range(valid_break_points, start.saturating_add(1), char_count)
                     .unwrap_or((start + 1).min(char_count));
-            let start_byte = index.char_to_byte(start);
-            let break_byte = index.char_to_byte(fallback_break_pos);
-            chunks.push(&text[start_byte..break_byte]);
+            chunks.push((start, fallback_break_pos));
             start = fallback_break_pos;
         }
     }
@@ -165,15 +192,14 @@ fn find_best_break_point(
     }
 
     // Look for whitespace breaks (priority: high)
-    if let Some((byte_idx, _)) = search_range
+    if let Some((byte_idx, space_char)) = search_range
         .char_indices()
         .rev()
         .find(|(_, c)| c.is_whitespace())
     {
         let space_byte = search_start_byte + byte_idx;
-        if let Some(char_idx) = index.byte_to_char(
-            space_byte.saturating_add(get_char_at_offset(text, space_byte).len_utf8()),
-        ) && is_valid_break_point(tcc_positions, char_idx)
+        if let Some(char_idx) = index.byte_to_char(space_byte.saturating_add(space_char.len_utf8()))
+            && is_valid_break_point(tcc_positions, char_idx)
         {
             return char_idx;
         }
@@ -368,5 +394,26 @@ mod tests {
 
         let chunks = split_text_into_chunks(text, 0, &valid_break_points);
         assert_eq!(chunks, vec![text]);
+    }
+
+    #[test]
+    fn test_split_text_into_chunk_ranges_preserves_text() {
+        let text = "ภาษาไทยภาษาไทยภาษาไทยABC";
+        let char_count = text.chars().count();
+        let valid_break_points: Vec<usize> = (0..=char_count).collect();
+
+        let ranges = split_text_into_chunk_ranges(text, 8, &valid_break_points);
+        let idx = TextIndex::new(text);
+        let rebuilt = ranges
+            .iter()
+            .map(|(start, end)| {
+                let s = idx.char_to_byte(*start);
+                let e = idx.char_to_byte(*end);
+                &text[s..e]
+            })
+            .collect::<Vec<_>>()
+            .concat();
+
+        assert_eq!(rebuilt, text);
     }
 }
