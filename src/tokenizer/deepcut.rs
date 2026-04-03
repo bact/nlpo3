@@ -427,7 +427,7 @@ fn build_features(text_chars: &[char]) -> (Vec<f32>, Vec<f32>) {
 ///
 /// let tokenizer = DeepcutTokenizer::new().unwrap();
 /// let tokens = tokenizer
-///     .segment_to_string("ทดสอบการตัดคำ")
+///     .segment("ทดสอบการตัดคำ")
 ///     .expect("segmentation failed");
 /// assert!(!tokens.is_empty());
 /// assert_eq!(tokens.join(""), "ทดสอบการตัดคำ");
@@ -596,37 +596,11 @@ impl DeepcutTokenizer {
 
         Ok(parallel_helper::flatten_tokens(token_vecs))
     }
-
-    /// Segment text to string with parallel mode disabled.
-    ///
-    /// Equivalent to calling `segment_with_options(text, None)`.
-    ///
-    /// Returns an error if tokenization fails.
-    pub fn segment_to_string(&self, text: &str) -> AnyResult<Vec<String>> {
-        self.segment_to_string_with_options(text, None)
-    }
-
-    /// Segment text to string with explicit parallel chunk configuration.
-    ///
-    /// Equivalent to calling `segment_with_options(text, parallel_chunk_size)`.
-    ///
-    /// Returns an error if tokenization fails.
-    pub fn segment_to_string_with_options(
-        &self,
-        text: &str,
-        parallel_chunk_size: Option<usize>,
-    ) -> AnyResult<Vec<String>> {
-        self.segment_with_options(text, parallel_chunk_size)
-    }
 }
 
 impl Tokenizer for DeepcutTokenizer {
     /// Tokenize `text` using the deepcut ONNX model.
     fn segment(&self, text: &str) -> AnyResult<Vec<String>> {
-        self.segment_with_options(text, None)
-    }
-
-    fn segment_to_string(&self, text: &str) -> AnyResult<Vec<String>> {
         self.segment_with_options(text, None)
     }
 }
@@ -666,32 +640,9 @@ mod tests {
     #[test]
     fn test_tokenizer_trait() {
         let tok = DeepcutTokenizer::new().expect("model should load");
-        let tokens = tok.segment_to_string("ทดสอบ").unwrap();
+        let tokens = tok.segment("ทดสอบ").unwrap();
         assert!(!tokens.is_empty());
         assert_eq!(tokens.join(""), "ทดสอบ");
-    }
-
-    #[test]
-    fn test_segment_to_string_matches_segment() {
-        let tok = DeepcutTokenizer::new().expect("model should load");
-        let text = "ทดสอบการตัดคำ";
-
-        let via_segment_to_string = tok.segment_to_string(text).unwrap();
-        let via_segment = tok.segment(text).unwrap();
-
-        assert_eq!(via_segment_to_string, via_segment);
-    }
-
-    #[test]
-    fn test_segment_to_string_with_options_matches_segment_with_options() {
-        let tok = DeepcutTokenizer::new().expect("model should load");
-        let text = "ทดสอบการตัดคำ";
-        let options = Some(16_384usize);
-
-        let via_segment_to_string = tok.segment_to_string_with_options(text, options).unwrap();
-        let via_segment = tok.segment_with_options(text, options).unwrap();
-
-        assert_eq!(via_segment_to_string, via_segment);
     }
 
     #[test]

@@ -11,7 +11,7 @@ use nlpo3::tokenizer::deepcut::DeepcutTokenizer;
 // Opaque wrapper — holds any tokenizer behind a trait object.
 //
 // A single TokenizerWrapper can serve many concurrent segment() calls because
-// segment_to_string() takes &self (immutable read).  Create one wrapper,
+// segment() takes &self (immutable read). Create one wrapper,
 // hold its JsBox handle, and reuse it for every call — the dictionary is
 // never copied or reloaded.
 // ---------------------------------------------------------------------------

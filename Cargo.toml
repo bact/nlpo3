@@ -24,7 +24,7 @@ exclude = [
     "build_tools/*",
     "tests/*",
     "nlpo3-cli/*",
-    "nlpo3-js/*",
+    "nlpo3-nodejs/*",
     "nlpo3-python/*",
 ]
 

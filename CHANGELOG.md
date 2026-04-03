@@ -23,15 +23,15 @@ Major release with breaking changes.
 
 ### Changed
 
-- Improved API consistency for Rust, JavaScript, Python, and CLI.
+- Improved API consistency for Rust, Node.js, Python, and CLI.
 - Improved behavior on difficult and highly ambiguous text.
 - Updated project/toolchain to current major versions (2.0.0 line).
-- **Breaking:** JavaScript and Python moved from global/free-function style APIs to
+- **Breaking:** Node.js and Python moved from global/free-function style APIs to
   class-based tokenizer APIs.
-- **Breaking (Rust):** `Tokenizer::segment_to_string` and tokenizer-specific
-  `segment_to_string*` methods now return `AnyResult<Vec<String>>`
-  (`anyhow::Result<Vec<String>>`) instead of
-  silently returning fallback values on error.
+- **Breaking (Rust):** removed legacy `Tokenizer::segment_to_string` and
+  tokenizer-specific `segment_to_string*` methods. Use `segment(...)` and
+  `segment_with_options(...)` instead; both remain fallible and return
+  `AnyResult<Vec<String>>` (`anyhow::Result<Vec<String>>`).
 
 ### Removed
 
@@ -58,7 +58,7 @@ tok = NewmmTokenizer("path/to/dict.txt")
 tokens = tok.segment("สวัสดีครับ")
 ```
 
-JavaScript:
+Node.js ESM:
 
 ```javascript
 // Before (v1.x)

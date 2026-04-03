@@ -1,4 +1,4 @@
-name: Test nlpo3-js
+name: Test nlpo3-nodejs
 on:
   push:
     branches:
@@ -8,14 +8,14 @@ on:
       - "Cargo.toml"
       - "Cargo.lock"
       - "model/**"
-      - "nlpo3-js/src/**"
-      - "nlpo3-js/nlpo3/**"
-      - "nlpo3-js/tests/**"
-      - "nlpo3-js/Cargo.toml"
-      - "nlpo3-js/package.json"
-      - "nlpo3-js/package-lock.json"
-      - "nlpo3-js/tsconfig.json"
-      - ".github/workflows/test-nlpo3-js.yml"
+      - "nlpo3-nodejs/src/**"
+      - "nlpo3-nodejs/nlpo3/**"
+      - "nlpo3-nodejs/tests/**"
+      - "nlpo3-nodejs/Cargo.toml"
+      - "nlpo3-nodejs/package.json"
+      - "nlpo3-nodejs/package-lock.json"
+      - "nlpo3-nodejs/tsconfig.json"
+      - ".github/workflows/test-nlpo3-nodejs.yml"
   pull_request:
     branches:
       - main
@@ -24,26 +24,26 @@ on:
       - "Cargo.toml"
       - "Cargo.lock"
       - "model/**"
-      - "nlpo3-js/src/**"
-      - "nlpo3-js/nlpo3/**"
-      - "nlpo3-js/tests/**"
-      - "nlpo3-js/Cargo.toml"
-      - "nlpo3-js/package.json"
-      - "nlpo3-js/package-lock.json"
-      - "nlpo3-js/tsconfig.json"
-      - ".github/workflows/test-nlpo3-js.yml"
+      - "nlpo3-nodejs/src/**"
+      - "nlpo3-nodejs/nlpo3/**"
+      - "nlpo3-nodejs/tests/**"
+      - "nlpo3-nodejs/Cargo.toml"
+      - "nlpo3-nodejs/package.json"
+      - "nlpo3-nodejs/package-lock.json"
+      - "nlpo3-nodejs/tsconfig.json"
+      - ".github/workflows/test-nlpo3-nodejs.yml"
 
 defaults:
   run:
-    working-directory: nlpo3-js
+    working-directory: nlpo3-nodejs
 
 jobs:
-  test-js:
+  test-nodejs:
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        node-version: ["22.x", "24.x", "current"]
+        node-version: ["22.x", "23.x", "24.x", "25.x"]
 
     runs-on: ${{ matrix.os }}
 
@@ -55,11 +55,11 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
 
       - name: Set up Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.node-version }}
           cache: "npm"
-          cache-dependency-path: nlpo3-js/package-lock.json
+          cache-dependency-path: nlpo3-nodejs/package-lock.json
 
       - name: Install Node.js dependencies
         run: npm ci --ignore-scripts

@@ -2,14 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /**
- * Integration tests for the nlpO3 JavaScript binding.
+ * Integration tests for the nlpO3 Node.js binding.
  *
  * Requires the native addon to be built and TypeScript compiled first:
  *   npm run build && tsc
  *   node --test tests/test_tokenizers.js
  *
  * Uses Node.js built-in test runner (node:test, available since Node 18).
- * This package supports Node.js 22 and newer.
+ * This package supports Node.js 22, 23, 24, and 25.
  */
 
 import assert from "node:assert/strict";
@@ -24,7 +24,7 @@ const DICT_PATH = path.join(__dirname, "data", "test_dict.txt");
 
 test("runtime version is supported", () => {
     const major = Number(process.versions.node.split(".")[0]);
-    assert.ok(Number.isInteger(major) && major >= 22, "Node.js 22+ is required");
+    assert.ok([22, 23, 24, 25].includes(major), "Node.js 22/23/24/25 is required");
 });
 
 // ---------------------------------------------------------------------------

@@ -1,14 +1,11 @@
 // SPDX-FileCopyrightText: 2024-2026 PyThaiNLP Project
 // SPDX-License-Identifier: Apache-2.0
 
-import type { TokenizerHandle } from "./rust_mod";
+import type { TokenizerHandle } from "./rust_mod.js";
 import { createRequire } from "node:module";
-import { fileURLToPath } from "node:url";
-import path from "node:path";
 
 const require = createRequire(import.meta.url);
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const native = require(path.join(__dirname, "rust_mod.node")) as typeof import("./rust_mod");
+const native = require("./rust_mod.node") as typeof import("./rust_mod.js");
 
 // ---------------------------------------------------------------------------
 // Shared types

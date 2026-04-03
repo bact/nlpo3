@@ -13,7 +13,7 @@ intended for end-user release notes.
 - The tokenizer API was normalized around explicit tokenizer objects.
 - Core trait methods were simplified to text-only calls for default behavior.
 - Advanced controls were moved to explicit option-bearing methods.
-- JavaScript and Python bindings migrated from global registry helpers to
+- Node.js and Python bindings migrated from global registry helpers to
   class-based APIs.
 
 ## Tokenizer families

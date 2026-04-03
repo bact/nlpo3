@@ -5,9 +5,9 @@ use anyhow::Result as AnyResult;
 
 /// Shared interface for all Thai word tokenizers.
 ///
-/// The `segment` and `segment_to_string` methods are read-only operations and
-/// are safe to call from multiple threads concurrently.  The `Send + Sync`
-/// supertraits are required so that `Box<dyn Tokenizer>` and
+/// The `segment` method is read-only and safe to call from multiple threads
+/// concurrently. The `Send + Sync` supertraits are required so that
+/// `Box<dyn Tokenizer>` and
 /// `Arc<dyn Tokenizer>` can be shared across threads without additional
 /// bounds at call sites.  Implementations may expose additional mutation
 /// methods (for example, to add or remove words) that require `&mut self`
@@ -19,12 +19,4 @@ use anyhow::Result as AnyResult;
 pub trait Tokenizer: Send + Sync {
     /// Segment text into words.
     fn segment(&self, text: &str) -> AnyResult<Vec<String>>;
-
-    /// Segment text into words, returning an `AnyResult<Vec<String>>`
-    /// (`anyhow::Result<Vec<String>>`).
-    ///
-    /// This is a fallible entry point equivalent to [`Tokenizer::segment`].
-    /// It is kept for API naming parity across bindings and tokenizers.
-    /// Callers decide whether to propagate, recover, or panic.
-    fn segment_to_string(&self, text: &str) -> AnyResult<Vec<String>>;
 }

@@ -9,7 +9,7 @@ SPDX-License-Identifier: Apache-2.0
 [![Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg "Apache-2.0")](https://opensource.org/license/apache-2-0)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.14082448.svg)](https://doi.org/10.5281/zenodo.14082448)
 
-A Thai natural language processing library in Rust, with JavaScript/TypeScript and Python bindings.
+A Thai natural language processing library in Rust, with Node.js/TypeScript and Python bindings.
 
 Formerly known as `oxidized-thainlp`, it was originally developed by
 Thanathip Suntorntip.
@@ -31,7 +31,7 @@ Rust:
 cargo add nlpo3
 ```
 
-JavaScript/TypeScript:
+Node.js/TypeScript:
 
 ```shell
 npm install nlpo3
@@ -88,9 +88,9 @@ fn main() {
 
 ## Error handling
 
-- Rust: `segment(...)` and `segment_to_string(...)` return `AnyResult<Vec<String>>` (`anyhow::Result<Vec<String>>`).
+- Rust: `segment(...)` returns `AnyResult<Vec<String>>` (`anyhow::Result<Vec<String>>`).
 - Python: tokenizer methods raise `RuntimeError` on tokenization/inference failures.
-- JavaScript/TypeScript: tokenizer methods throw `Error` on tokenization/inference failures.
+- Node.js/TypeScript: tokenizer methods throw `Error` on tokenization/inference failures.
 
 Use the host language's normal error handling style (`?`, `try/except`,
 `try/catch`) to decide whether to propagate, recover, or fail fast.
@@ -115,7 +115,7 @@ For technical implementation and design notes, see
 
 ## Bindings
 
-- JavaScript/TypeScript: [nlpo3-js](./nlpo3-js/)
+- Node.js/TypeScript: [nlpo3-nodejs](./nlpo3-nodejs/)
 - Python: [nlpo3-python](./nlpo3-python/)
 - CLI: [nlpo3-cli](./nlpo3-cli/)
 
