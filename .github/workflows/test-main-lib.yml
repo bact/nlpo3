@@ -6,7 +6,9 @@ on:
     paths:
     - 'src/**'
     - 'Cargo.toml'
+    - 'Cargo.lock'
     - 'tests/**'
+    - 'words_th.txt'
     - '.github/workflows/test-main-lib.yml'
   pull_request:
     branches:
@@ -15,10 +17,12 @@ on:
     - 'src/**'
     - 'tests/**'
     - 'Cargo.toml'
+    - 'Cargo.lock'
+    - 'words_th.txt'
     - '.github/workflows/test-main-lib.yml'
 
 jobs:
-  test:
+  test-main-lib:
     strategy:
       fail-fast: false
       matrix:
@@ -36,6 +40,9 @@ jobs:
 
     - name: Setup Rust toolchain
       uses: actions-rust-lang/setup-rust-toolchain@v1
+
+    - name: Test publish
+      run: cargo publish --dry-run
 
     - name: Test
       run: cargo test

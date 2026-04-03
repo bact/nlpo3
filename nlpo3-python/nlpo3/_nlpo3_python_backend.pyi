@@ -57,6 +57,12 @@ class NewmmTokenizer:
             parallel_chunk_size: Target chunk size in bytes for chunked parallel
                       processing. `None`, `0`, or low values disable parallel mode.
 
+        Note:
+            When ``parallel_chunk_size`` is set, text is split into chunks.
+            Token sequences near chunk boundaries may differ from full-text
+            results. Suitable for classification and embedding tasks; not
+            recommended for tasks requiring precise token boundaries.
+
         Returns:
             List of word tokens.
 
@@ -110,6 +116,12 @@ class NewmmFstTokenizer:
             safe:     Enable safe mode (default: False).
             parallel_chunk_size: Target chunk size in bytes for chunked parallel
                       processing. `None`, `0`, or low values disable parallel mode.
+
+        Note:
+            When ``parallel_chunk_size`` is set, text is split into chunks.
+            Token sequences near chunk boundaries may differ from full-text
+            results. Suitable for classification and embedding tasks; not
+            recommended for tasks requiring precise token boundaries.
 
         Returns:
             List of word tokens.
@@ -165,6 +177,14 @@ class DeepcutTokenizer:
             text: Input text to tokenize.
             parallel_chunk_size: Target chunk size in bytes for chunked parallel
                         processing. `None`, `0`, or low values disable parallel mode.
+
+        Note:
+            When ``parallel_chunk_size`` is set, text is split into chunks.
+            Because deepcut uses a fixed-width context window, characters near
+            chunk boundaries have fewer adjacent context characters, so token
+            sequences near boundaries may differ from full-text results.
+            Suitable for classification and embedding tasks; not recommended
+            for tasks requiring precise token boundaries.
 
         Returns:
             List of word tokens.

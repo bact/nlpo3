@@ -71,6 +71,36 @@ Fallback:
 
 - Use nearest safe boundary to preserve forward progress.
 
+## Chunk boundary behavior
+
+When `parallel_chunk_size` is set, text is split into chunks before
+tokenization. Token sequences near chunk boundaries can differ from
+full-text tokenization.
+
+Reasons for the divergence:
+
+- **NewMM:** dictionary matching at the boundary may prefer different token
+  paths when the surrounding context changes between full-text and chunked
+  processing.
+- **Deepcut:** the CNN model uses a fixed-width context window (21 characters).
+  Characters near chunk boundaries have fewer adjacent context characters from
+  the neighboring chunk, which shifts model predictions.
+
+The chunked output is acceptable for tasks that treat text holistically, such
+as text classification and word embedding. It may not be suitable for tasks
+that require precise linguistic unit identification.
+
+### Future direction: fine-grained chunk merging
+
+Smooth boundary stitching is a potential future improvement. For
+dictionary-based tokenizers (NewMM), a partial implementation exists in the
+safe-mode boundary-scanning logic (`TEXT_SCAN_LEFT`/`TEXT_SCAN_RIGHT` window),
+but it trades performance for accuracy, and enabling it on the chunk boundary
+alone may degrade overall throughput. The boundary window size and the chunk
+size ratio that yield negligible accuracy loss have not been established. A
+future implementation would need to measure this trade-off to find practical
+default settings.
+
 ## NewMM safety and ambiguity behavior
 
 - Safe mode remains available for highly ambiguous text.

@@ -96,6 +96,12 @@ fn main() {
 
 Auto-parallel helpers are available via `segment_parallel(...)` on tokenizers.
 
+> **Note on parallel mode accuracy:** when `parallel_chunk_size` is set, text
+> is split into chunks before tokenization. Token sequences near chunk
+> boundaries may differ from full-text results. This is acceptable for tasks
+> such as text classification and word embedding, but may not be suitable for
+> tasks that require precise linguistic unit identification.
+
 For technical implementation and design notes, see
 [docs/impl-notes.md](./docs/impl-notes.md).
 

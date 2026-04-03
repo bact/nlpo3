@@ -552,11 +552,20 @@ impl DeepcutTokenizer {
     /// Segment text with explicit parallel chunk configuration.
     ///
     /// - `None`, `0`, or values below `MIN_CHUNK_SIZE` disable parallel mode.
-    /// - valid values enable parallel chunk processing for long inputs.
+    /// - Valid values enable parallel chunk processing for long inputs.
     ///
-    /// Note: Deepcut feature extraction uses surrounding context, so chunked
-    /// segmentation can differ slightly near chunk boundaries versus full-text
-    /// segmentation.
+    /// # Chunk boundary behavior
+    ///
+    /// When `parallel_chunk_size` is set, text is split into chunks before
+    /// tokenization. Because deepcut uses a fixed-width context window, characters
+    /// near chunk boundaries have fewer adjacent context characters from the
+    /// neighboring chunk. This causes token sequences near boundaries to differ
+    /// from full-text tokenization. The effect scales with chunk size: smaller
+    /// chunks introduce more boundaries and thus more divergence.
+    ///
+    /// Chunked output is acceptable for throughput-oriented tasks such as text
+    /// classification and word embedding. It may not be suitable for tasks that
+    /// require precise linguistic unit identification.
     pub fn segment_with_options(
         &self,
         text: &str,

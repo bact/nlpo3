@@ -72,6 +72,12 @@ struct SegmentOpts {
     ///
     /// Optionally pass chunk size in bytes. If the flag is provided without
     /// a value, the default chunk size is used.
+    ///
+    /// When parallel mode is active, text is split into chunks before
+    /// tokenization. Token sequences near chunk boundaries may differ from
+    /// full-text results. This is acceptable for bulk processing tasks such as
+    /// classification and embedding, but may not be suitable for tasks that
+    /// require precise token boundaries.
     #[arg(
         short = 'p',
         long = "parallel",

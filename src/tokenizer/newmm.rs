@@ -593,6 +593,12 @@ impl<D: DictBackend> NewmmTokenizer<D> {
     }
 
     /// Segment text with explicit options.
+    ///
+    /// When `parallel_chunk_size` is set, text is split into chunks before
+    /// tokenization. Token sequences near chunk boundaries may differ from
+    /// full-text results. This is acceptable for throughput-oriented tasks
+    /// such as text classification and word embedding, but may not be suitable
+    /// for tasks that require precise linguistic unit identification.
     pub fn segment_with_options(
         &self,
         text: &str,

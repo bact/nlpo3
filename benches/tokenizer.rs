@@ -37,14 +37,17 @@ use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_m
 use nlpo3::{
     char_string::CharString,
     tokenizer::{
-        deepcut::DeepcutTokenizer,
         fst_dict::FstDict,
         newmm::{NewmmFstTokenizer, NewmmTokenizer},
-        parallel_helper,
-        parallel_options::ParallelOptions,
-        tcc::tcc_tokenizer,
         trie_char::TrieChar,
     },
+};
+#[cfg(feature = "deepcut")]
+use nlpo3::tokenizer::{
+    deepcut::DeepcutTokenizer,
+    parallel_helper,
+    parallel_options::ParallelOptions,
+    tcc::tcc_tokenizer,
 };
 use std::hint::black_box;
 

@@ -4,25 +4,37 @@ on:
     branches:
       - main
     paths:
-      - "nlpo3-python/**"
-      - "!notebooks/"
-      - "!LICENSE"
-      - "!*.md"
+      - "src/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "model/**"
+      - "nlpo3-python/src/**"
+      - "nlpo3-python/nlpo3/**"
+      - "nlpo3-python/tests/**"
+      - "nlpo3-python/Cargo.toml"
+      - "nlpo3-python/pyproject.toml"
+      - ".github/workflows/test-nlpo3-python.yml"
   pull_request:
     branches:
       - main
     paths:
-      - "nlpo3-python/**"
-      - "!notebooks/"
-      - "!LICENSE"
-      - "!*.md"
+      - "src/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "model/**"
+      - "nlpo3-python/src/**"
+      - "nlpo3-python/nlpo3/**"
+      - "nlpo3-python/tests/**"
+      - "nlpo3-python/Cargo.toml"
+      - "nlpo3-python/pyproject.toml"
+      - ".github/workflows/test-nlpo3-python.yml"
 
 defaults:
   run:
     working-directory: nlpo3-python
 
 jobs:
-  test:
+  test-python:
     strategy:
       fail-fast: true
       matrix:

@@ -67,8 +67,14 @@ export class NewmmTokenizer {
      * Tokenize `text` into words.
      *
      * @param text     Input text.
-     * @param options  Optional flags: `safe` and `parallel`.
+     * @param options  Optional flags: `safe` and `parallelChunkSize`.
      * @returns        Array of word tokens.
+     *
+     * @remarks
+     * When {@link SegmentOptions.parallelChunkSize} is set, text is split into
+     * chunks before tokenization. Token sequences near chunk boundaries may
+     * differ from full-text results. Suitable for classification and embedding
+     * tasks; not recommended for tasks requiring precise token boundaries.
      */
     segment(text: string, options: SegmentOptions = {}): string[] {
         const { safe = false, parallelChunkSize } = options;
@@ -111,8 +117,14 @@ export class NewmmFstTokenizer {
      * Tokenize `text` into words.
      *
      * @param text     Input text.
-     * @param options  Optional flags: `safe` and `parallel`.
+     * @param options  Optional flags: `safe` and `parallelChunkSize`.
      * @returns        Array of word tokens.
+     *
+     * @remarks
+     * When {@link SegmentOptions.parallelChunkSize} is set, text is split into
+     * chunks before tokenization. Token sequences near chunk boundaries may
+     * differ from full-text results. Suitable for classification and embedding
+     * tasks; not recommended for tasks requiring precise token boundaries.
      */
     segment(text: string, options: SegmentOptions = {}): string[] {
         const { safe = false, parallelChunkSize } = options;
@@ -152,8 +164,18 @@ export class DeepcutTokenizer {
     /**
      * Tokenize `text` using the deepcut CNN model.
      *
-     * @param text  Input text.
-     * @returns     Array of word tokens.
+     * @param text              Input text.
+     * @param parallelChunkSize Target chunk size in bytes for parallel mode.
+     *                          `undefined`, `0`, or low values disable parallel mode.
+     * @returns                 Array of word tokens.
+     *
+     * @remarks
+     * When `parallelChunkSize` is set, text is split into chunks. Because
+     * deepcut uses a fixed-width context window, characters near chunk
+     * boundaries have fewer adjacent context characters, so token sequences
+     * near boundaries may differ from full-text results. Suitable for
+     * classification and embedding tasks; not recommended for tasks requiring
+     * precise token boundaries.
      */
     segment(text: string, parallelChunkSize?: number): string[] {
         return native.deepcutTokenizerSegment(this._handle, text, parallelChunkSize ?? null);

@@ -191,6 +191,7 @@ fn newmm_fst_tokenizer_segment(mut cx: FunctionContext) -> JsResult<JsArray> {
 // Returns:
 //   string[]
 // ---------------------------------------------------------------------------
+#[cfg(feature = "deepcut")]
 fn deepcut_tokenizer_segment(mut cx: FunctionContext) -> JsResult<JsArray> {
     let wrapper = cx.argument::<JsBox<TokenizerWrapper>>(0)?;
     let text = cx.argument::<JsString>(1)?.value(&mut cx);

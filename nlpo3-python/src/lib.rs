@@ -76,6 +76,12 @@ impl PyNewmmTokenizer {
     ///     parallel_chunk_size: Target chunk size in bytes for parallel mode.
     ///               `None`, `0`, or low values disable parallel mode.
     ///
+    /// Note:
+    ///     When ``parallel_chunk_size`` is set, text is split into chunks.
+    ///     Token sequences near chunk boundaries may differ from full-text
+    ///     results. Suitable for classification and embedding tasks; not
+    ///     recommended for tasks requiring precise token boundaries.
+    ///
     /// Returns:
     ///     List of word tokens.
     ///
@@ -153,6 +159,12 @@ impl PyNewmmFstTokenizer {
     ///     safe:     Enable safe mode (default: False).
     ///     parallel_chunk_size: Target chunk size in bytes for parallel mode.
     ///               `None`, `0`, or low values disable parallel mode.
+    ///
+    /// Note:
+    ///     When ``parallel_chunk_size`` is set, text is split into chunks.
+    ///     Token sequences near chunk boundaries may differ from full-text
+    ///     results. Suitable for classification and embedding tasks; not
+    ///     recommended for tasks requiring precise token boundaries.
     ///
     /// Returns:
     ///     List of word tokens.
@@ -244,17 +256,23 @@ impl PyDeepcutTokenizer {
     /// from multiple threads.
     ///
     /// Args:
-    ///     text: Input text to tokenize.
+    ///     text:     Input text to tokenize.
+    ///     parallel_chunk_size: Target chunk size in bytes for parallel mode.
+    ///                 `None`, `0`, or low values disable parallel mode.
+    ///
+    /// Note:
+    ///     When ``parallel_chunk_size`` is set, text is split into chunks.
+    ///     Because deepcut uses a fixed-width context window, characters near
+    ///     chunk boundaries have fewer adjacent context characters, so token
+    ///     sequences near boundaries may differ from full-text results.
+    ///     Suitable for classification and embedding tasks; not recommended
+    ///     for tasks requiring precise token boundaries.
     ///
     /// Returns:
     ///     List of word tokens.
     ///
     /// Raises:
     ///     RuntimeError: If ONNX inference fails.
-    /// Args:
-    ///     text:     Input text to tokenize.
-    ///     parallel_chunk_size: Target chunk size in bytes for parallel mode.
-    ///                 `None`, `0`, or low values disable parallel mode.
     #[pyo3(signature = (text, parallel_chunk_size = None))]
     fn segment(
         &self,
