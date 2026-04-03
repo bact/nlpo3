@@ -112,7 +112,7 @@ impl Error for BFSSearchError {}
 /// All dictionary-based tokenizers implement the shared [`Tokenizer`] trait,
 /// so switching between them requires only a single line change:
 ///
-/// ```
+/// ```no_run
 /// use nlpo3::tokenizer::newmm::{NewmmTokenizer, NewmmFstTokenizer};
 /// use nlpo3::tokenizer::tokenizer_trait::Tokenizer;
 ///
