@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /**
- * Integration tests for the nlpo3 JavaScript binding.
+ * Integration tests for the nlpO3 JavaScript binding.
  *
  * Requires the native addon to be built and TypeScript compiled first:
  *   npm run build && tsc

@@ -99,6 +99,6 @@ Recommended dictionaries:
 
 ## License
 
-nlpO3 Node.js binding is copyrighted by its authors
+nlpO3 JavaScript binding is copyrighted by its authors
 and licensed under terms of the Apache Software License 2.0 (Apache-2.0).
 See file [LICENSE](./LICENSE) for details.

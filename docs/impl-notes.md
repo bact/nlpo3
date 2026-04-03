@@ -13,7 +13,7 @@ intended for end-user release notes.
 - The tokenizer API was normalized around explicit tokenizer objects.
 - Core trait methods were simplified to text-only calls for default behavior.
 - Advanced controls were moved to explicit option-bearing methods.
-- Python and Node.js bindings migrated from global registry helpers to
+- JavaScript and Python bindings migrated from global registry helpers to
   class-based APIs.
 
 ## Tokenizer families
@@ -159,7 +159,7 @@ API behavior proposal:
   - If deepcut package is present, `DeepcutTokenizer` is available.
   - If absent, import or construction returns a clear guidance error message.
 
-### Node.js packaging proposal
+### npm packaging proposal
 
 Proposed packages:
 
