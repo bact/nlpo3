@@ -59,6 +59,9 @@ pub fn split_text_into_chunks<'a>(
     target_chunk_size: usize,
     valid_break_points: &[usize],
 ) -> Vec<&'a str> {
+    if target_chunk_size == 0 {
+        return vec![text];
+    }
     if text.len() <= target_chunk_size {
         return vec![text];
     }
@@ -353,5 +356,15 @@ mod tests {
         let chunks = split_text_into_chunks(text, 8, &valid_break_points);
         let rebuilt = chunks.concat();
         assert_eq!(rebuilt, text);
+    }
+
+    #[test]
+    fn test_split_text_zero_chunk_size_returns_whole_text() {
+        let text = "ภาษาไทยภาษาไทยภาษาไทยABC";
+        let char_count = text.chars().count();
+        let valid_break_points: Vec<usize> = (0..=char_count).collect();
+
+        let chunks = split_text_into_chunks(text, 0, &valid_break_points);
+        assert_eq!(chunks, vec![text]);
     }
 }

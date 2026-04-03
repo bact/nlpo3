@@ -56,8 +56,10 @@ const NON_THAI_READABLE_PATTERN: &[&str; 5] = &[
 ];
 
 lazy_static! {
-    static ref NON_THAI_PATTERN: Regex = Regex::new(&NON_THAI_READABLE_PATTERN.join("|")).unwrap();
-    static ref THAI_TWOCHARS_PATTERN: Regex = Regex::new(r"^[ก-ฮ]{0,2}$").unwrap();
+    static ref NON_THAI_PATTERN: Regex = Regex::new(&NON_THAI_READABLE_PATTERN.join("|"))
+        .expect("newmm: NON_THAI_PATTERN must be a valid static regex");
+    static ref THAI_TWOCHARS_PATTERN: Regex = Regex::new(r"^[ก-ฮ]{0,2}$")
+        .expect("newmm: THAI_TWOCHARS_PATTERN must be a valid static regex");
 }
 
 #[derive(Clone, Debug)]
@@ -184,8 +186,10 @@ impl NewmmTokenizer<TrieChar> {
     ///
     /// Construction from a word list is infallible.
     pub fn from_word_list(word_list: Vec<String>) -> Self {
+        let char_word_list: Vec<CharString> =
+            word_list.into_iter().map(|w| CharString::new(&w)).collect();
         NewmmTokenizer {
-            dict: Arc::new(create_dict_trie(DictSource::WordList(word_list)).unwrap()),
+            dict: Arc::new(TrieChar::new(&char_word_list)),
         }
     }
 }
@@ -264,22 +268,26 @@ impl NewmmFstTokenizer {
 
     /// Segment text to string with default options (safe=false, parallel disabled).
     ///
-    /// If tokenization fails, returns an empty vector.
-    pub fn segment_to_string(&self, text: &str) -> Vec<String> {
+    /// Equivalent to calling `segment_with_options(text, false, None)`.
+    ///
+    /// Returns an error if tokenization fails.
+    pub fn segment_to_string(&self, text: &str) -> AnyResult<Vec<String>> {
         self.segment_to_string_with_options(text, false, None)
     }
 
     /// Segment text to string with explicit options.
     ///
-    /// If tokenization fails, returns an empty vector.
+    /// Equivalent to calling `segment_with_options(text, safe, parallel_chunk_size)`.
+    ///
+    /// Returns an error if tokenization fails.
     pub fn segment_to_string_with_options(
         &self,
         text: &str,
         safe: bool,
         parallel_chunk_size: Option<usize>,
-    ) -> Vec<String> {
+    ) -> AnyResult<Vec<String>> {
         self.inner
-            .segment_to_string_with_options(text, safe, parallel_chunk_size)
+            .segment_with_options(text, safe, parallel_chunk_size)
     }
 }
 
@@ -288,8 +296,8 @@ impl Tokenizer for NewmmFstTokenizer {
         self.segment_with_options(text, false, None)
     }
 
-    fn segment_to_string(&self, text: &str) -> Vec<String> {
-        self.segment(text).unwrap_or_default()
+    fn segment_to_string(&self, text: &str) -> AnyResult<Vec<String>> {
+        self.segment_with_options(text, false, None)
     }
 }
 
@@ -425,7 +433,9 @@ impl<D: DictBackend> NewmmTokenizer<D> {
                         end_position = position;
                     }
                 } else {
-                    panic!("Incorrect position list");
+                    return Err(anyhow::anyhow!(
+                        "newmm invariant violated: expected one candidate in position_list"
+                    ));
                 }
             } else if position_list_length == 0 {
                 // No candidate: handle non-dictionary segment.
@@ -614,27 +624,30 @@ impl<D: DictBackend> NewmmTokenizer<D> {
 
     /// Segment text to string with default options (safe=false, parallel disabled).
     ///
-    /// If tokenization fails, returns an empty vector.
-    pub fn segment_to_string(&self, text: &str) -> Vec<String> {
+    /// Equivalent to calling `segment_with_options(text, false, None)`.
+    ///
+    /// Returns an error if tokenization fails.
+    pub fn segment_to_string(&self, text: &str) -> AnyResult<Vec<String>> {
         self.segment_to_string_with_options(text, false, None)
     }
 
     /// Segment text to string with explicit options.
     ///
-    /// If tokenization fails, returns an empty vector.
+    /// Equivalent to calling `segment_with_options(text, safe, parallel_chunk_size)`.
+    ///
+    /// Returns an error if tokenization fails.
     pub fn segment_to_string_with_options(
         &self,
         text: &str,
         safe: bool,
         parallel_chunk_size: Option<usize>,
-    ) -> Vec<String> {
+    ) -> AnyResult<Vec<String>> {
         Self::internal_segment(
             &CharString::new(text),
             &*self.dict,
             safe,
             parallel_chunk_size,
         )
-        .unwrap_or_default()
     }
 }
 
@@ -643,8 +656,8 @@ impl<D: DictBackend> Tokenizer for NewmmTokenizer<D> {
         self.segment_with_options(text, false, None)
     }
 
-    fn segment_to_string(&self, text: &str) -> Vec<String> {
-        self.segment(text).unwrap_or_default()
+    fn segment_to_string(&self, text: &str) -> AnyResult<Vec<String>> {
+        self.segment_with_options(text, false, None)
     }
 }
 
@@ -668,11 +681,9 @@ mod tests {
         let tok = NewmmTokenizer::from_word_list(sample_word_list());
         let text = "ภาษาไทยทดสอบการตัดคำ";
 
-        let via_default = tok.segment_to_string(text);
-        let via_explicit = tok.segment_to_string_with_options(text, false, None);
-        let via_result = tok
-            .segment_with_options(text, false, None)
-            .unwrap_or_default();
+        let via_default = tok.segment_to_string(text).unwrap();
+        let via_explicit = tok.segment_to_string_with_options(text, false, None).unwrap();
+        let via_result = tok.segment_with_options(text, false, None).unwrap();
 
         assert_eq!(via_default, via_explicit);
         assert_eq!(via_explicit, via_result);
@@ -683,8 +694,9 @@ mod tests {
         let tok = NewmmTokenizer::from_word_list(sample_word_list());
         let text = "ภาษาไทยทดสอบการตัดคำ";
 
-        let via_inherent = tok.segment_to_string(text);
-        let via_trait = <NewmmTokenizer<TrieChar> as Tokenizer>::segment_to_string(&tok, text);
+        let via_inherent = tok.segment_to_string(text).unwrap();
+        let via_trait = <NewmmTokenizer<TrieChar> as Tokenizer>::segment_to_string(&tok, text)
+            .unwrap();
 
         assert_eq!(via_inherent, via_trait);
     }
@@ -694,11 +706,9 @@ mod tests {
         let tok = NewmmFstTokenizer::from_word_list(sample_word_list()).unwrap();
         let text = "ภาษาไทยทดสอบการตัดคำ";
 
-        let via_default = tok.segment_to_string(text);
-        let via_explicit = tok.segment_to_string_with_options(text, false, None);
-        let via_result = tok
-            .segment_with_options(text, false, None)
-            .unwrap_or_default();
+        let via_default = tok.segment_to_string(text).unwrap();
+        let via_explicit = tok.segment_to_string_with_options(text, false, None).unwrap();
+        let via_result = tok.segment_with_options(text, false, None).unwrap();
 
         assert_eq!(via_default, via_explicit);
         assert_eq!(via_explicit, via_result);
@@ -709,9 +719,31 @@ mod tests {
         let tok = NewmmFstTokenizer::from_word_list(sample_word_list()).unwrap();
         let text = "ภาษาไทยทดสอบการตัดคำ";
 
-        let via_inherent = tok.segment_to_string(text);
-        let via_trait = <NewmmFstTokenizer as Tokenizer>::segment_to_string(&tok, text);
+        let via_inherent = tok.segment_to_string(text).unwrap();
+        let via_trait = <NewmmFstTokenizer as Tokenizer>::segment_to_string(&tok, text).unwrap();
 
         assert_eq!(via_inherent, via_trait);
+    }
+
+    #[test]
+    fn newmm_segment_to_string_matches_segment() {
+        let tok = NewmmTokenizer::from_word_list(sample_word_list());
+        let text = "ภาษาไทยทดสอบการตัดคำ";
+
+        let via_segment_to_string = tok.segment_to_string(text).unwrap();
+        let via_segment = tok.segment(text).unwrap();
+
+        assert_eq!(via_segment_to_string, via_segment);
+    }
+
+    #[test]
+    fn newmm_fst_segment_to_string_matches_segment() {
+        let tok = NewmmFstTokenizer::from_word_list(sample_word_list()).unwrap();
+        let text = "ภาษาไทยทดสอบการตัดคำ";
+
+        let via_segment_to_string = tok.segment_to_string(text).unwrap();
+        let via_segment = tok.segment(text).unwrap();
+
+        assert_eq!(via_segment_to_string, via_segment);
     }
 }

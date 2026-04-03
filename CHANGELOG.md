@@ -28,6 +28,9 @@ Major release with breaking changes.
 - Updated project/toolchain to current major versions (2.0.0 line).
 - **Breaking:** JavaScript and Python moved from global/free-function style APIs to
   class-based tokenizer APIs.
+- **Breaking (Rust):** `Tokenizer::segment_to_string` and tokenizer-specific
+  `segment_to_string*` methods now return `Result<Vec<String>, E>` instead of
+  silently returning fallback values on error.
 
 ### Removed
 

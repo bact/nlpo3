@@ -68,10 +68,13 @@ pub fn tcc_pos(text: &str) -> Vec<usize> {
             }
         } else {
             // Non-Thai character: treat as a single-character cluster.
-            let c = txt.chars().next().unwrap();
-            txt = &txt[c.len_utf8()..];
-            position += 1;
-            positions.push(position);
+            if let Some(c) = txt.chars().next() {
+                txt = &txt[c.len_utf8()..];
+                position += 1;
+                positions.push(position);
+            } else {
+                break;
+            }
         }
     }
     positions

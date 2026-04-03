@@ -51,6 +51,14 @@ tok_deepcut = DeepcutTokenizer()
 print(tok_deepcut.segment("สวัสดีครับ"))
 ```
 
+## Error handling
+
+- `segment(...)` raises `RuntimeError` if tokenization or inference fails.
+- Constructor methods (for example, loading dictionaries or models) also raise
+  `RuntimeError` on failure.
+
+Handle these with standard Python `try/except` blocks.
+
 ## Segment options
 
 | Option | Type | Default | Description |

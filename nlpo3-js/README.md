@@ -61,6 +61,13 @@ const options: SegmentOptions = { safe: false, parallelChunkSize: 16384 };
 const tokensParallel: string[] = tok.segment("สวัสดีครับ", options);
 ```
 
+## Error handling
+
+- `segment(...)` throws `Error` if tokenization or inference fails.
+- Constructor calls can also throw `Error` when dictionary/model loading fails.
+
+Handle these with standard JavaScript/TypeScript `try/catch` blocks.
+
 ## Segment options
 
 | Option | Type | Default | Description |

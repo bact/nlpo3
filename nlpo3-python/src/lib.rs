@@ -66,6 +66,9 @@ impl PyNewmmTokenizer {
     /// The tokenizer is immutable — the same instance is safe to call from
     /// multiple threads concurrently without any locking.
     ///
+    /// This method releases the Python Global Interpreter Lock (GIL) while
+    /// running tokenization so other Python threads can continue executing.
+    ///
     /// Args:
     ///     text:     Input text to tokenize.
     ///     safe:     Enable safe mode to avoid long run times on inputs with
@@ -87,6 +90,7 @@ impl PyNewmmTokenizer {
     #[pyo3(signature = (text, safe = false, parallel_chunk_size = None))]
     fn segment(
         &self,
+        py: Python<'_>,
         text: &str,
         safe: bool,
         parallel_chunk_size: Option<usize>,
@@ -94,8 +98,7 @@ impl PyNewmmTokenizer {
         if text.is_empty() {
             return Ok(vec![]);
         }
-        self.inner
-            .segment_with_options(text, safe, parallel_chunk_size)
+        py.detach(|| self.inner.segment_with_options(text, safe, parallel_chunk_size))
             .map_err(|e| exceptions::PyRuntimeError::new_err(format!("segmentation failed: {}", e)))
     }
 }
@@ -146,6 +149,9 @@ impl PyNewmmFstTokenizer {
     /// The tokenizer is immutable — the same instance is safe to call from
     /// multiple threads concurrently without any locking.
     ///
+    /// This method releases the Python Global Interpreter Lock (GIL) while
+    /// running tokenization so other Python threads can continue executing.
+    ///
     /// Args:
     ///     text:     Input text to tokenize.
     ///     safe:     Enable safe mode (default: False).
@@ -166,6 +172,7 @@ impl PyNewmmFstTokenizer {
     #[pyo3(signature = (text, safe = false, parallel_chunk_size = None))]
     fn segment(
         &self,
+        py: Python<'_>,
         text: &str,
         safe: bool,
         parallel_chunk_size: Option<usize>,
@@ -173,8 +180,7 @@ impl PyNewmmFstTokenizer {
         if text.is_empty() {
             return Ok(vec![]);
         }
-        self.inner
-            .segment_with_options(text, safe, parallel_chunk_size)
+        py.detach(|| self.inner.segment_with_options(text, safe, parallel_chunk_size))
             .map_err(|e| exceptions::PyRuntimeError::new_err(format!("tokenization failed: {}", e)))
     }
 }
@@ -245,6 +251,9 @@ impl PyDeepcutTokenizer {
     /// Inference is thread-safe: the same instance may be called concurrently
     /// from multiple threads.
     ///
+    /// This method releases the Python Global Interpreter Lock (GIL) while
+    /// running inference so other Python threads can continue executing.
+    ///
     /// Args:
     ///     text:     Input text to tokenize.
     ///     parallel_chunk_size: Target chunk size in bytes for parallel mode.
@@ -264,13 +273,17 @@ impl PyDeepcutTokenizer {
     /// Raises:
     ///     RuntimeError: If ONNX inference fails.
     #[pyo3(signature = (text, parallel_chunk_size = None))]
-    fn segment(&self, text: &str, parallel_chunk_size: Option<usize>) -> PyResult<Vec<String>> {
+    fn segment(
+        &self,
+        py: Python<'_>,
+        text: &str,
+        parallel_chunk_size: Option<usize>,
+    ) -> PyResult<Vec<String>> {
         if text.is_empty() {
             return Ok(vec![]);
         }
 
-        self.inner
-            .segment_with_options(text, parallel_chunk_size)
+        py.detach(|| self.inner.segment_with_options(text, parallel_chunk_size))
             .map_err(|e| {
                 exceptions::PyRuntimeError::new_err(format!("deepcut: inference failed: {}", e))
             })
