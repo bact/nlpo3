@@ -5,6 +5,8 @@ SPDX-License-Identifier: Apache-2.0
 
 # Benchmark results: three Thai tokenizers compared
 
+Updated on: 2026-04-03 00:00
+
 This document records the results of running `cargo bench` (and
 `cargo bench --features deepcut` for `DeepcutTokenizer`).
 

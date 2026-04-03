@@ -19,7 +19,7 @@ Command-line interface for nlpO3 Thai word tokenization.
 - Improved error handling and user-facing messages.
 - Better support for long-input processing.
 
-For implementation details, see [../docs/impl-notes.md](../docs/impl-notes.md).
+For implementation details, see [../docs/implemention.md](../docs/implemention.md).
 
 ## Install
 

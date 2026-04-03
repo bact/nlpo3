@@ -49,4 +49,4 @@ tokens = DeepcutTokenizer().segment("สวัสดีครับ")
 ```
 
 For implementation details and design choices, see
-[docs/impl-notes.md](../docs/impl-notes.md) in the repository root.
+[docs/implemention.md](../docs/implemention.md) in the repository root.

@@ -49,6 +49,7 @@ Use this file as the default working agreement for nlpO3.
 - Reuse computed indices/maps when converting char and byte offsets repeatedly.
 - Keep clone operations cheap for shared immutable state (for example Arc-backed internals).
 - Add regression tests for known worst cases and benchmark-sensitive paths.
+- When update BENCHMARK_RESULTS.md, put date and time of benchmarking.
 
 ## Documentation and style
 

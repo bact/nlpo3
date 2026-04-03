@@ -72,7 +72,7 @@ const tokens = tok.segment("สวัสดีครับ");
 ```
 
 For implementation details and design choices, see
-[docs/impl-notes.md](./docs/impl-notes.md).
+[docs/implemention.md](./docs/implemention.md).
 
 ## [1.4.0] - 2024-11-09
 

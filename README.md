@@ -111,7 +111,7 @@ Auto-parallel helpers are available via `segment_parallel(...)` on tokenizers.
 > tasks that require precise linguistic unit identification.
 
 For technical implementation and design notes, see
-[docs/impl-notes.md](./docs/impl-notes.md).
+[docs/implemention.md](./docs/implemention.md).
 
 ## Bindings
 
