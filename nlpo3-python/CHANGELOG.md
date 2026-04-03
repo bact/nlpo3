@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2.0.0] - 2026-04-01
+Major release with breaking changes.
 
 ### Added
 
@@ -50,6 +50,3 @@ tokens = DeepcutTokenizer().segment("สวัสดีครับ")
 
 For implementation details and design choices, see
 [docs/impl-notes.md](../docs/impl-notes.md) in the repository root.
-
-[Unreleased]: https://github.com/PyThaiNLP/nlpo3/compare/v2.0.0...HEAD
-[2.0.0]: https://github.com/PyThaiNLP/nlpo3/compare/v1.4.0...v2.0.0

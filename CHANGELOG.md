@@ -7,12 +7,12 @@ SPDX-License-Identifier: Apache-2.0
 
 All notable changes to this project are documented in this file.
 
-This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
-conventions. Version numbers follow [Semantic Versioning](https://semver.org/).
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-## [2.0.0] - 2026-04-03
+Major release with breaking changes.
 
 ### Added
 
@@ -90,8 +90,6 @@ For implementation details and design choices, see
 - Custom dictionary support.
 - Python binding published on PyPI as `pythainlp-rust-modules`.
 
-[2.0.0]: https://github.com/PyThaiNLP/nlpo3/compare/v1.4.0...v2.0.0
 [1.4.0]: https://github.com/PyThaiNLP/nlpo3/releases/tag/v1.4.0
 [1.1.2]: https://github.com/PyThaiNLP/nlpo3/releases/tag/v1.1.2
 [0.2.0-beta]: https://github.com/PyThaiNLP/nlpo3/releases/tag/v0.2.0-beta
-[Unreleased]: https://github.com/PyThaiNLP/nlpo3/compare/v2.0.0...HEAD
