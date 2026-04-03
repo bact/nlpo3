@@ -20,7 +20,8 @@ pub trait Tokenizer: Send + Sync {
     /// Segment text into words.
     fn segment(&self, text: &str) -> AnyResult<Vec<String>>;
 
-    /// Segment text into words, returning a `Result<Vec<String>, E>`.
+    /// Segment text into words, returning an `AnyResult<Vec<String>>`
+    /// (`anyhow::Result<Vec<String>>`).
     ///
     /// This is a fallible entry point equivalent to [`Tokenizer::segment`].
     /// It is kept for API naming parity across bindings and tokenizers.

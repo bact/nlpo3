@@ -18,7 +18,7 @@ Rust-powered Thai tokenization library for JavaScript.
   - `DeepcutTokenizer` — Neural network-based tokenizer.
 - Framework-independent and suitable for any JavaScript environment.
 - Improved runtime stability and long-text handling.
-- Tested with on Node.js 22 and 24.
+- Tested on Node.js 22 and 24.
 
 For implementation details and design choices, see
 [../docs/impl-notes.md](../docs/impl-notes.md).

@@ -88,7 +88,7 @@ fn main() {
 
 ## Error handling
 
-- Rust: `segment(...)` and `segment_to_string(...)` return `Result<Vec<String>, E>`.
+- Rust: `segment(...)` and `segment_to_string(...)` return `AnyResult<Vec<String>>` (`anyhow::Result<Vec<String>>`).
 - Python: tokenizer methods raise `RuntimeError` on tokenization/inference failures.
 - JavaScript/TypeScript: tokenizer methods throw `Error` on tokenization/inference failures.
 

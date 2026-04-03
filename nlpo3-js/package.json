@@ -1,7 +1,7 @@
 {
   "name": "nlpo3",
   "version": "2.0.0",
-  "description": "Rust-powered Thai language tokenizer and word segmentation library for JavaScript",
+  "description": "nlpO3 Thai language tokenizer and word segmentation library for JavaScript (ESM) with TypeScript types",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/PyThaiNLP/nlpo3.git"
@@ -31,21 +31,25 @@
   "bugs": {
     "url": "https://github.com/PyThaiNLP/nlpo3/issues"
   },
-  "homepage": "https://github.com/PyThaiNLP/nlpo3/",
+  "homepage": "https://github.com/PyThaiNLP/nlpo3/tree/main/nlpo3-js",
   "type": "module",
   "main": "./nlpo3/index.js",
+  "module": "./nlpo3/index.js",
   "types": "./nlpo3/index.d.ts",
+  "sideEffects": false,
   "exports": {
     ".": {
       "types": "./nlpo3/index.d.ts",
-      "import": "./nlpo3/index.js"
-    }
+      "import": "./nlpo3/index.js",
+      "default": "./nlpo3/index.js"
+    },
+    "./package.json": "./package.json"
   },
   "scripts": {
     "build": "cargo-cp-artifact -a cdylib nlpo3_js ./nlpo3/rust_mod.node -- cargo build --message-format=json-render-diagnostics",
     "release": "cargo-cp-artifact -a cdylib nlpo3_js ./nlpo3/rust_mod.node -- cargo build --release --message-format=json-render-diagnostics && tsc",
-    "install": "npm run build",
-    "prepack": "tsc",
+    "prepare": "npm run build",
+    "prepack": "npm run release",
     "test": "npm run build && tsc && node --test tests/test_tokenizers.js"
   },
   "devDependencies": {
@@ -56,11 +60,17 @@
   "engines": {
     "node": ">=22"
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "files": [
     "Cargo.toml",
     "src/**",
     "nlpo3/index.js",
     "nlpo3/index.d.ts",
-    "nlpo3/rust_mod.d.ts"
+    "nlpo3/rust_mod.d.ts",
+    "nlpo3/rust_mod.node",
+    "README.md",
+    "LICENSE"
   ]
 }

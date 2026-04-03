@@ -29,7 +29,8 @@ Major release with breaking changes.
 - **Breaking:** JavaScript and Python moved from global/free-function style APIs to
   class-based tokenizer APIs.
 - **Breaking (Rust):** `Tokenizer::segment_to_string` and tokenizer-specific
-  `segment_to_string*` methods now return `Result<Vec<String>, E>` instead of
+  `segment_to_string*` methods now return `AnyResult<Vec<String>>`
+  (`anyhow::Result<Vec<String>>`) instead of
   silently returning fallback values on error.
 
 ### Removed
