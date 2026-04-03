@@ -9,11 +9,11 @@ use nlpo3::tokenizer::newmm::NewmmTokenizer;
 const FIRST_TEXT: &str = "นิสสันผ่อนจนเพลียนาวาร่า..";
 const SECOND_TEXT: &str =
     "อาชญากรรมทางการแพทย์.. หลอกลวงคนไข้ผ่าตัด ตัดหมอนรองข้อเข่าอำพราง รพ.กรุงเทพภูเก็ตปลอมเวชระเบียน ตอนที่๑.";
-const DEFAULT_DICT_PATH: &str = "/words_th.txt"; // relative to cargo
+const DEFAULT_DICT_PATH: &str = "/tests/data/words_th.txt"; // relative to cargo
 
 #[test]
 fn test_dict_with_empty_line() {
-    const DICT_PATH: &str = "/tests/data/dict_with_empty_line.txt";
+    const DICT_PATH: &str = "/tests/data/dict-with-empty-line.txt";
     let mut relative_dict_path = env!("CARGO_MANIFEST_DIR").to_string();
     relative_dict_path.push_str(DICT_PATH);
     let _tokenizer = NewmmTokenizer::new(&relative_dict_path).unwrap();

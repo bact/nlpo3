@@ -17,7 +17,7 @@ enum TokenizerWrapper {
     Deepcut(DeepcutTokenizer),
 }
 
-const DEFAULT_DICT: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../words_th.txt"));
+const DEFAULT_DICT: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/words_th.txt"));
 const DEFAULT_PARALLEL_CHUNK_SIZE_STR: &str = "65536";
 
 #[derive(Parser, Debug)]

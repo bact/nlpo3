@@ -111,8 +111,3 @@ default settings.
 - Tokenizer instances are designed for read-heavy concurrent usage.
 - Dictionary structures are shared where possible.
 - Mutation methods use copy-on-write behavior when shared ownership exists.
-
-## Why user docs are concise
-
-- README and CHANGELOG files target average library users.
-- Internal architecture details, heuristics, and trade-offs are documented here.
