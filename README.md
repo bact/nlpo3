@@ -20,7 +20,7 @@ Thanathip Suntorntip.
 - Three tokenizer choices with a consistent API:
   - `NewmmTokenizer` (dictionary, fastest)
   - `NewmmFstTokenizer` (dictionary, lower memory)
-  - `DeepcutTokenizer` (neural model)
+  - `DeepcutTokenizer` (neural model, requires feature `deepcut`)
 - Thread-safe tokenizer instances for concurrent use.
 - Improved handling for ambiguous and large input.
 
@@ -70,6 +70,12 @@ fn main() {
 ```
 
 Neural tokenizer:
+
+Enable feature first:
+
+```toml
+nlpo3 = { version = "2.0", features = ["deepcut"] }
+```
 
 ```rust
 use nlpo3::tokenizer::deepcut::DeepcutTokenizer;

@@ -37,9 +37,12 @@ use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_m
 use nlpo3::{
     char_string::CharString,
     tokenizer::{
+        deepcut::DeepcutTokenizer,
         fst_dict::FstDict,
         newmm::{NewmmFstTokenizer, NewmmTokenizer},
+        parallel_helper,
         parallel_options::ParallelOptions,
+        tcc::tcc_tokenizer,
         trie_char::TrieChar,
     },
 };
@@ -348,13 +351,12 @@ fn bench_clone_cost(c: &mut Criterion) {
 fn bench_deepcut_chunking_overhead(c: &mut Criterion) {
     use std::time::Duration;
 
-    let tok = nlpo3::tokenizer::deepcut::DeepcutTokenizer::new()
-        .expect("deepcut: ONNX model failed to load");
+    let tok = DeepcutTokenizer::new().expect("deepcut: ONNX model failed to load");
 
     // Ensure input is large enough to cross chunk thresholds.
     let huge_text = LONG_TEXT.repeat(240);
     let len = huge_text.len();
-    let seq_chunk_size = len.saturating_sub(1).max(ParallelOptions::MIN_CHUNK_SIZE);
+    let seq_chunk_size = ParallelOptions::MIN_CHUNK_SIZE;
 
     let mut group = c.benchmark_group("deepcut_chunking_overhead");
     group.sample_size(10);
@@ -373,10 +375,16 @@ fn bench_deepcut_chunking_overhead(c: &mut Criterion) {
         &huge_text,
         |b, t| {
             b.iter(|| {
-                black_box(
-                    tok.segment_with_options(black_box(t), Some(seq_chunk_size))
-                        .unwrap(),
-                )
+                let tcc_positions = tcc_tokenizer::tcc_pos(black_box(t));
+                let chunks = parallel_helper::split_text_into_chunks(
+                    black_box(t),
+                    seq_chunk_size,
+                    &tcc_positions,
+                );
+                let token_vecs =
+                    parallel_helper::tokenize_chunks(chunks, false, |chunk| tok.tokenize(chunk))
+                        .unwrap();
+                black_box(parallel_helper::flatten_tokens(token_vecs))
             })
         },
     );

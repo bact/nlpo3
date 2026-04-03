@@ -19,6 +19,7 @@ use std::{collections::VecDeque, error::Error, fmt::Display, path::PathBuf, sync
 use super::{
     dict_backend::DictBackend,
     dict_reader::{DictSource, create_dict_fst, create_dict_trie},
+    parallel_helper,
     parallel_options::ParallelOptions,
     tcc::tcc_tokenizer,
     tokenizer_trait::Tokenizer,
@@ -487,86 +488,87 @@ impl<D: DictBackend> NewmmTokenizer<D> {
         Ok(result_str)
     }
 
+    fn segment_single(input: &CharString, custom_dict: &D, safe: bool) -> AnyResult<Vec<String>> {
+        if !safe || input.chars_len() < TEXT_SCAN_END {
+            return Self::one_cut(input, custom_dict)
+                .map(|parts| parts.into_iter().map(|s| s.to_string()).collect());
+        }
+
+        let mut txt = input.substring(0, input.chars_len());
+        let mut txt_parts: Vec<CharString> = Vec::with_capacity(txt.chars_len() / 10);
+        while txt.chars_len() >= TEXT_SCAN_END {
+            let sample = txt.substring(TEXT_SCAN_BEGIN, TEXT_SCAN_END);
+            let cut_pos = if let Some(space_char_index) = rfind_space_char_index(sample.as_str()) {
+                space_char_index + 1
+            } else {
+                let word_tokens = Self::one_cut(&sample, custom_dict)?;
+                let mut token_max_index = 0;
+                let mut token_max_length = 0;
+                for (idx, &token) in word_tokens.iter().enumerate() {
+                    let tok_chars = token.chars().count();
+                    if tok_chars >= token_max_length {
+                        token_max_length = tok_chars;
+                        token_max_index = idx;
+                    }
+                }
+                let mut cut_pos = TEXT_SCAN_BEGIN;
+                for &token in word_tokens.iter().take(token_max_index) {
+                    cut_pos += token.chars().count();
+                }
+                cut_pos
+            };
+
+            txt_parts.push(txt.substring(0, cut_pos));
+            txt = txt.substring(cut_pos, txt.chars_len());
+        }
+        if !txt.is_empty() {
+            txt_parts.push(txt);
+        }
+
+        let mut out: Vec<String> = Vec::new();
+        for part in &txt_parts {
+            let chunk = part.substring(0, part.chars_len());
+            let words = Self::one_cut(&chunk, custom_dict)?;
+            out.extend(words.into_iter().map(|s| s.to_string()));
+        }
+        Ok(out)
+    }
+
     fn internal_segment(
         input: &CharString,
         custom_dict: &D,
         safe: bool,
         parallel_chunk_size: Option<usize>,
     ) -> AnyResult<Vec<String>> {
-        let parallel_options = ParallelOptions::from_chunk_size(parallel_chunk_size);
-        let parallel = parallel_options.should_parallelize(input.as_str().len());
-
         if input.is_empty() {
             return Ok(vec![]);
         }
-        if !safe || input.chars_len() < TEXT_SCAN_END {
-            let result = Self::one_cut(input, custom_dict)?;
-            Ok(if parallel {
-                result.into_par_iter().map(|s| s.to_string()).collect()
-            } else {
-                result.into_iter().map(|s| s.to_string()).collect()
-            })
-        } else {
-            let mut txt = input.substring(0, input.chars_len());
-            let mut txt_parts: Vec<CharString> = Vec::with_capacity(txt.chars_len() / 10);
-            while txt.chars_len() >= TEXT_SCAN_END {
-                let sample = txt.substring(TEXT_SCAN_BEGIN, TEXT_SCAN_END);
-                let mut cut_pos;
 
-                let space_char_index = rfind_space_char_index(sample.as_str());
-                if let Some(space_char_index) = space_char_index {
-                    cut_pos = space_char_index + 1;
-                } else {
-                    let word_tokens = Self::one_cut(&sample, custom_dict)?;
-                    let mut token_max_index = 0;
-                    let mut token_max_length = 0;
-                    for (idx, &token) in word_tokens.iter().enumerate() {
-                        let tok_chars = token.chars().count();
-                        if tok_chars >= token_max_length {
-                            token_max_length = tok_chars;
-                            token_max_index = idx;
-                        }
-                    }
-                    cut_pos = TEXT_SCAN_BEGIN;
-                    for &token in word_tokens.iter().take(token_max_index) {
-                        cut_pos += token.chars().count();
-                    }
-                }
-                txt_parts.push(txt.substring(0, cut_pos));
-                txt = txt.substring(cut_pos, txt.chars_len());
-            }
-            if !txt.is_empty() {
-                txt_parts.push(txt);
-            }
-
-            Ok(if parallel {
-                txt_parts
-                    .par_iter()
-                    .flat_map(|part| -> AnyResult<_> {
-                        let bind_part = &part.substring(0, part.chars_len());
-                        let words = Self::one_cut(bind_part, custom_dict)?;
-                        Ok(words
-                            .into_par_iter()
-                            .map(|s| s.to_string())
-                            .collect::<Vec<String>>())
-                    })
-                    .flatten()
-                    .collect()
-            } else {
-                txt_parts
-                    .iter()
-                    .flat_map(|part| -> AnyResult<_> {
-                        Ok(
-                            Self::one_cut(&part.substring(0, part.chars_len()), custom_dict)?
-                                .iter()
-                                .map(|s| s.to_string())
-                                .collect::<Vec<String>>(),
-                        )
-                    })
-                    .flatten()
-                    .collect()
-            })
+        // Preserve historical safe-mode behavior; safe mode already uses a
+        // dedicated splitting strategy to avoid pathological inputs.
+        if safe {
+            return Self::segment_single(input, custom_dict, true);
         }
+
+        let parallel_options = ParallelOptions::from_chunk_size(parallel_chunk_size);
+        if !parallel_options.enabled || input.as_str().len() <= parallel_options.chunk_size {
+            return Self::segment_single(input, custom_dict, false);
+        }
+
+        let text = input.as_str();
+        let tcc_positions = tcc_tokenizer::tcc_pos(text);
+        let chunks = parallel_helper::split_text_into_chunks(
+            text,
+            parallel_options.chunk_size,
+            &tcc_positions,
+        );
+        let token_vecs = parallel_helper::tokenize_chunks(
+            chunks,
+            parallel_options.should_parallelize(text.len()),
+            |chunk| Self::segment_single(&CharString::new(chunk), custom_dict, false),
+        )?;
+
+        Ok(parallel_helper::flatten_tokens(token_vecs))
     }
 }
 

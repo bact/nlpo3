@@ -71,8 +71,10 @@ pub fn split_text_into_chunks<'a>(
     sorted_break_points.sort_unstable();
     let mut start: usize = 0; // character index
     while start < char_count {
-        let target_end = start + (target_chunk_size / 4); // rough estimate: ~4 bytes per Thai char
-        let target_end = target_end.min(char_count);
+        let start_byte = index.char_to_byte(start);
+        let mut target_end_byte = start_byte.saturating_add(target_chunk_size).min(text.len());
+        target_end_byte = clamp_to_char_boundary_right(text, target_end_byte);
+        let target_end = index.byte_to_char(target_end_byte).unwrap_or(char_count);
         // Find the best break point near the target
         let break_pos = find_best_break_point(
             text,
