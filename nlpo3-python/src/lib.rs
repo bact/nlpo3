@@ -11,7 +11,6 @@ use std::path::Path;
 
 use nlpo3::tokenizer::deepcut::DeepcutTokenizer;
 use nlpo3::tokenizer::newmm::{NewmmFstTokenizer, NewmmTokenizer};
-use nlpo3::tokenizer::tokenizer_trait::Tokenizer;
 use pyo3::exceptions;
 use pyo3::prelude::*;
 
@@ -72,21 +71,26 @@ impl PyNewmmTokenizer {
     ///     text:     Input text to tokenize.
     ///     safe:     Enable safe mode to avoid long run times on inputs with
     ///               many ambiguous word boundaries (default: False).
-    ///     parallel: Enable multi-threaded processing (default: False).
-    ///               Uses more memory; benefits long texts on multi-core hosts.
+    ///     parallel_chunk_size: Target chunk size in bytes for parallel mode.
+    ///               `None`, `0`, or low values disable parallel mode.
     ///
     /// Returns:
     ///     List of word tokens.
     ///
     /// Raises:
     ///     RuntimeError: If tokenization fails.
-    #[pyo3(signature = (text, safe = false, parallel = false))]
-    fn segment(&self, text: &str, safe: bool, parallel: bool) -> PyResult<Vec<String>> {
+    #[pyo3(signature = (text, safe = false, parallel_chunk_size = None))]
+    fn segment(
+        &self,
+        text: &str,
+        safe: bool,
+        parallel_chunk_size: Option<usize>,
+    ) -> PyResult<Vec<String>> {
         if text.is_empty() {
             return Ok(vec![]);
         }
         self.inner
-            .segment(text, safe, parallel)
+            .segment_with_options(text, safe, parallel_chunk_size)
             .map_err(|e| {
                 exceptions::PyRuntimeError::new_err(format!("segmentation failed: {}", e))
             })
@@ -143,20 +147,26 @@ impl PyNewmmFstTokenizer {
     /// Args:
     ///     text:     Input text to tokenize.
     ///     safe:     Enable safe mode (default: False).
-    ///     parallel: Enable multi-threaded processing (default: False).
+    ///     parallel_chunk_size: Target chunk size in bytes for parallel mode.
+    ///               `None`, `0`, or low values disable parallel mode.
     ///
     /// Returns:
     ///     List of word tokens.
     ///
     /// Raises:
     ///     RuntimeError: If tokenization fails.
-    #[pyo3(signature = (text, safe = false, parallel = false))]
-    fn segment(&self, text: &str, safe: bool, parallel: bool) -> PyResult<Vec<String>> {
+    #[pyo3(signature = (text, safe = false, parallel_chunk_size = None))]
+    fn segment(
+        &self,
+        text: &str,
+        safe: bool,
+        parallel_chunk_size: Option<usize>,
+    ) -> PyResult<Vec<String>> {
         if text.is_empty() {
             return Ok(vec![]);
         }
         self.inner
-            .segment(text, safe, parallel)
+            .segment_with_options(text, safe, parallel_chunk_size)
             .map_err(|e| {
                 exceptions::PyRuntimeError::new_err(format!("tokenization failed: {}", e))
             })
@@ -235,11 +245,21 @@ impl PyDeepcutTokenizer {
     ///
     /// Raises:
     ///     RuntimeError: If ONNX inference fails.
-    fn segment(&self, text: &str) -> PyResult<Vec<String>> {
+    /// Args:
+    ///     text:     Input text to tokenize.
+    ///     parallel_chunk_size: Target chunk size in bytes for parallel mode.
+    ///                 `None`, `0`, or low values disable parallel mode.
+    #[pyo3(signature = (text, parallel_chunk_size = None))]
+    fn segment(
+        &self,
+        text: &str,
+        parallel_chunk_size: Option<usize>,
+    ) -> PyResult<Vec<String>> {
         if text.is_empty() {
             return Ok(vec![]);
         }
-        self.inner.tokenize(text).map_err(|e| {
+
+        self.inner.segment_with_options(text, parallel_chunk_size).map_err(|e| {
             exceptions::PyRuntimeError::new_err(format!("deepcut: inference failed: {}", e))
         })
     }

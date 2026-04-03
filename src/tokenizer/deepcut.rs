@@ -27,6 +27,9 @@ use tract_onnx::prelude::*;
 // model's input fact.
 use tract_onnx::tract_hir::infer::Factoid;
 
+use super::parallel_helper;
+use super::parallel_options::ParallelOptions;
+use super::tcc::tcc_tokenizer;
 use super::tokenizer_trait::Tokenizer;
 
 /// Bundled deepcut ONNX model weights.
@@ -423,7 +426,7 @@ fn build_features(text_chars: &[char]) -> (Vec<f32>, Vec<f32>) {
 /// use nlpo3::tokenizer::tokenizer_trait::Tokenizer;
 ///
 /// let tokenizer = DeepcutTokenizer::new().unwrap();
-/// let tokens = tokenizer.segment_to_string("ทดสอบการตัดคำ", false, false);
+/// let tokens = tokenizer.segment_to_string("ทดสอบการตัดคำ");
 /// assert!(!tokens.is_empty());
 /// assert_eq!(tokens.join(""), "ทดสอบการตัดคำ");
 /// ```
@@ -524,17 +527,88 @@ impl Default for DeepcutTokenizer {
     }
 }
 
-impl Tokenizer for DeepcutTokenizer {
-    /// Tokenize `text` using the deepcut ONNX model.
-    ///
-    /// The `safe` and `parallel` flags are accepted for API compatibility
-    /// but have no effect on deepcut inference.
-    fn segment(&self, text: &str, _safe: bool, _parallel: bool) -> AnyResult<Vec<String>> {
-        self.tokenize(text)
+impl DeepcutTokenizer {
+    /// Segment text with parallel mode disabled.
+    pub fn segment(&self, text: &str) -> AnyResult<Vec<String>> {
+        self.segment_with_options(text, None)
     }
 
-    fn segment_to_string(&self, text: &str, safe: bool, parallel: bool) -> Vec<String> {
-        self.segment(text, safe, parallel).unwrap()
+    /// Segment text with automatically tuned parallel chunking.
+    ///
+    /// This computes a chunk size from input length and runtime CPU
+    /// parallelism, then forwards it to `segment_with_options()`.
+    pub fn segment_parallel(&self, text: &str) -> AnyResult<Vec<String>> {
+        let options = ParallelOptions::auto_for_text(text.len());
+        self.segment_with_options(
+            text,
+            if options.enabled {
+                Some(options.chunk_size)
+            } else {
+                None
+            },
+        )
+    }
+
+    /// Segment text with explicit parallel chunk configuration.
+    ///
+    /// - `None`, `0`, or values below `MIN_CHUNK_SIZE` disable parallel mode.
+    /// - valid values enable parallel chunk processing for long inputs.
+    pub fn segment_with_options(
+        &self,
+        text: &str,
+        parallel_chunk_size: Option<usize>,
+    ) -> AnyResult<Vec<String>> {
+        if text.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let options = ParallelOptions::from_chunk_size(parallel_chunk_size);
+
+        if text.len() <= options.chunk_size {
+            return self.tokenize(text);
+        }
+
+        let tcc_positions = tcc_tokenizer::tcc_pos(text);
+        let chunks = parallel_helper::split_text_into_chunks(
+            text,
+            options.chunk_size,
+            &tcc_positions,
+        );
+        let token_vecs = parallel_helper::tokenize_chunks(
+            chunks,
+            options.should_parallelize(text.len()),
+            |chunk| {
+            self.tokenize(chunk)
+            },
+        );
+
+        Ok(parallel_helper::flatten_tokens(token_vecs))
+    }
+
+    /// Segment text to string with parallel mode disabled.
+    pub fn segment_to_string(&self, text: &str) -> Vec<String> {
+        self.segment_to_string_with_options(text, None)
+    }
+
+    /// Segment text to string with explicit parallel chunk configuration.
+    pub fn segment_to_string_with_options(
+        &self,
+        text: &str,
+        parallel_chunk_size: Option<usize>,
+    ) -> Vec<String> {
+        self.segment_with_options(text, parallel_chunk_size)
+            .unwrap_or_default()
+    }
+}
+
+impl Tokenizer for DeepcutTokenizer {
+    /// Tokenize `text` using the deepcut ONNX model.
+    fn segment(&self, text: &str) -> AnyResult<Vec<String>> {
+        self.segment_with_options(text, None)
+    }
+
+    fn segment_to_string(&self, text: &str) -> Vec<String> {
+        self.segment(text).unwrap_or_default()
     }
 }
 
@@ -573,7 +647,7 @@ mod tests {
     #[test]
     fn test_tokenizer_trait() {
         let tok = DeepcutTokenizer::new().expect("model should load");
-        let tokens = tok.segment_to_string("ทดสอบ", false, false);
+        let tokens = tok.segment_to_string("ทดสอบ");
         assert!(!tokens.is_empty());
         assert_eq!(tokens.join(""), "ทดสอบ");
     }

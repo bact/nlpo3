@@ -7,6 +7,9 @@ pub mod dict_backend;
 mod dict_reader;
 pub mod fst_dict;
 pub mod newmm;
+#[cfg(feature = "deepcut")]
+mod parallel_helper;
+pub mod parallel_options;
 pub mod tcc;
 pub mod tokenizer_trait;
 pub mod trie_char;

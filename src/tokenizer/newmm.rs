@@ -19,6 +19,7 @@ use std::{collections::VecDeque, error::Error, fmt::Display, path::PathBuf, sync
 use super::{
     dict_backend::DictBackend,
     dict_reader::{DictSource, create_dict_fst, create_dict_trie},
+    parallel_options::ParallelOptions,
     tcc::tcc_tokenizer,
     tokenizer_trait::Tokenizer,
     trie_char::TrieChar,
@@ -229,15 +230,61 @@ impl NewmmFstTokenizer {
     pub fn remove_word(&mut self, word_list: &[&str]) {
         self.inner.remove_word(word_list);
     }
+
+    /// Segment text with default options (safe=false, parallel disabled).
+    pub fn segment(&self, text: &str) -> AnyResult<Vec<String>> {
+        self.segment_with_options(text, false, None)
+    }
+
+    /// Segment text with automatically tuned parallel chunking.
+    pub fn segment_parallel(&self, text: &str, safe: bool) -> AnyResult<Vec<String>> {
+        let options = ParallelOptions::auto_for_text(text.len());
+        self.segment_with_options(
+            text,
+            safe,
+            if options.enabled {
+                Some(options.chunk_size)
+            } else {
+                None
+            },
+        )
+    }
+
+    /// Segment text with explicit options.
+    pub fn segment_with_options(
+        &self,
+        text: &str,
+        safe: bool,
+        parallel_chunk_size: Option<usize>,
+    ) -> AnyResult<Vec<String>> {
+        self.inner
+            .segment_with_options(text, safe, parallel_chunk_size)
+    }
+
+    /// Segment text to string with default options (safe=false, parallel disabled).
+    pub fn segment_to_string(&self, text: &str) -> Vec<String> {
+        self.segment_to_string_with_options(text, false, None)
+    }
+
+    /// Segment text to string with explicit options.
+    pub fn segment_to_string_with_options(
+        &self,
+        text: &str,
+        safe: bool,
+        parallel_chunk_size: Option<usize>,
+    ) -> Vec<String> {
+        self.inner
+            .segment_to_string_with_options(text, safe, parallel_chunk_size)
+    }
 }
 
 impl Tokenizer for NewmmFstTokenizer {
-    fn segment(&self, text: &str, safe: bool, parallel: bool) -> AnyResult<Vec<String>> {
-        self.inner.segment(text, safe, parallel)
+    fn segment(&self, text: &str) -> AnyResult<Vec<String>> {
+        self.segment_with_options(text, false, None)
     }
 
-    fn segment_to_string(&self, text: &str, safe: bool, parallel: bool) -> Vec<String> {
-        self.inner.segment_to_string(text, safe, parallel)
+    fn segment_to_string(&self, text: &str) -> Vec<String> {
+        self.segment(text).unwrap()
     }
 }
 
@@ -444,8 +491,11 @@ impl<D: DictBackend> NewmmTokenizer<D> {
         input: &CharString,
         custom_dict: &D,
         safe: bool,
-        parallel: bool,
+        parallel_chunk_size: Option<usize>,
     ) -> AnyResult<Vec<String>> {
+        let parallel_options = ParallelOptions::from_chunk_size(parallel_chunk_size);
+        let parallel = parallel_options.should_parallelize(input.as_str().len());
+
         if input.is_empty() {
             return Ok(vec![]);
         }
@@ -520,12 +570,69 @@ impl<D: DictBackend> NewmmTokenizer<D> {
     }
 }
 
-impl<D: DictBackend> Tokenizer for NewmmTokenizer<D> {
-    fn segment(&self, text: &str, safe: bool, parallel: bool) -> AnyResult<Vec<String>> {
-        Self::internal_segment(&CharString::new(text), &*self.dict, safe, parallel)
+impl<D: DictBackend> NewmmTokenizer<D> {
+    /// Segment text with default options (safe=false, parallel disabled).
+    pub fn segment(&self, text: &str) -> AnyResult<Vec<String>> {
+        self.segment_with_options(text, false, None)
     }
 
-    fn segment_to_string(&self, text: &str, safe: bool, parallel: bool) -> Vec<String> {
-        self.segment(text, safe, parallel).unwrap()
+    /// Segment text with automatically tuned parallel chunking.
+    pub fn segment_parallel(&self, text: &str, safe: bool) -> AnyResult<Vec<String>> {
+        let options = ParallelOptions::auto_for_text(text.len());
+        self.segment_with_options(
+            text,
+            safe,
+            if options.enabled {
+                Some(options.chunk_size)
+            } else {
+                None
+            },
+        )
+    }
+
+    /// Segment text with explicit options.
+    pub fn segment_with_options(
+        &self,
+        text: &str,
+        safe: bool,
+        parallel_chunk_size: Option<usize>,
+    ) -> AnyResult<Vec<String>> {
+        Self::internal_segment(
+            &CharString::new(text),
+            &*self.dict,
+            safe,
+            parallel_chunk_size,
+        )
+    }
+
+    /// Segment text to string with default options (safe=false, parallel disabled).
+    pub fn segment_to_string(&self, text: &str) -> Vec<String> {
+        self.segment_to_string_with_options(text, false, None)
+    }
+
+    /// Segment text to string with explicit options.
+    pub fn segment_to_string_with_options(
+        &self,
+        text: &str,
+        safe: bool,
+        parallel_chunk_size: Option<usize>,
+    ) -> Vec<String> {
+        Self::internal_segment(
+            &CharString::new(text),
+            &*self.dict,
+            safe,
+            parallel_chunk_size,
+        )
+        .unwrap()
+    }
+}
+
+impl<D: DictBackend> Tokenizer for NewmmTokenizer<D> {
+    fn segment(&self, text: &str) -> AnyResult<Vec<String>> {
+        self.segment_with_options(text, false, None)
+    }
+
+    fn segment_to_string(&self, text: &str) -> Vec<String> {
+        self.segment(text).unwrap()
     }
 }

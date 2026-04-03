@@ -177,30 +177,30 @@ fn bench_full_tokenization(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("NewmmTokenizer/safe=false", label),
             text,
-            |b, t| b.iter(|| black_box(tok_trie.segment(black_box(t), false, false).unwrap())),
+            |b, t| b.iter(|| black_box(tok_trie.segment(black_box(t)).unwrap())),
         );
         group.bench_with_input(
             BenchmarkId::new("NewmmTokenizer/safe=true", label),
             text,
-            |b, t| b.iter(|| black_box(tok_trie.segment(black_box(t), true, false).unwrap())),
+            |b, t| b.iter(|| black_box(tok_trie.segment_with_options(black_box(t), true, false).unwrap())),
         );
 
         // NewmmFstTokenizer — CharString + FstDict (memory-efficient)
         group.bench_with_input(
             BenchmarkId::new("NewmmFstTokenizer/safe=false", label),
             text,
-            |b, t| b.iter(|| black_box(tok_fst.segment(black_box(t), false, false).unwrap())),
+            |b, t| b.iter(|| black_box(tok_fst.segment(black_box(t)).unwrap())),
         );
         group.bench_with_input(
             BenchmarkId::new("NewmmFstTokenizer/safe=true", label),
             text,
-            |b, t| b.iter(|| black_box(tok_fst.segment(black_box(t), true, false).unwrap())),
+            |b, t| b.iter(|| black_box(tok_fst.segment_with_options(black_box(t), true, false).unwrap())),
         );
 
         // DeepcutTokenizer — CNN/ONNX (only with --features deepcut)
         #[cfg(feature = "deepcut")]
         group.bench_with_input(BenchmarkId::new("DeepcutTokenizer", label), text, |b, t| {
-            b.iter(|| black_box(tok_deepcut.segment(black_box(t), false, false).unwrap()))
+            b.iter(|| black_box(tok_deepcut.segment(black_box(t)).unwrap()))
         });
     }
     group.finish();

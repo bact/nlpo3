@@ -13,8 +13,15 @@ use anyhow::Result as AnyResult;
 /// methods (for example, to add or remove words) that require `&mut self`
 /// and may use copy-on-write internally (such as cloning an underlying
 /// dictionary).
+///
+/// Each concrete tokenizer implementation may support additional options
+/// via specialized methods. See the concrete type's documentation for details.
 pub trait Tokenizer: Send + Sync {
-    fn segment(&self, text: &str, safe: bool, parallel: bool) -> AnyResult<Vec<String>>;
+    /// Segment text into words.
+    fn segment(&self, text: &str) -> AnyResult<Vec<String>>;
 
-    fn segment_to_string(&self, text: &str, safe: bool, parallel: bool) -> Vec<String>;
+    /// Segment text into words, returning a `Vec<String>`.
+    ///
+    /// Panics or returns empty on error (use `segment()` for error handling).
+    fn segment_to_string(&self, text: &str) -> Vec<String>;
 }

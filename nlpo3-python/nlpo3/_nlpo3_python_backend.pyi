@@ -140,9 +140,7 @@ class DeepcutTokenizer:
         tok = DeepcutTokenizer(model_path="/path/to/custom.onnx")
     """
 
-    def __new__(
-        cls, model_path: Optional[str] = None
-    ) -> "DeepcutTokenizer":
+    def __new__(cls, model_path: Optional[str] = None) -> "DeepcutTokenizer":
         """Create a DeepcutTokenizer.
 
         Args:
