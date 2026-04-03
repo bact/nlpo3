@@ -23,7 +23,7 @@ Python binding for nlpO3 Thai word tokenization.
 - Improved parallel processing controls for large input.
 
 For implementation details and design choices, see
-[../docs/implemention.md](../docs/implemention.md).
+[../docs/implementation.md](../docs/implementation.md).
 
 ## Install
 

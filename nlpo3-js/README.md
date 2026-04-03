@@ -21,7 +21,7 @@ Rust-powered Thai tokenization library for JavaScript.
 - Tested on Node.js 22 and 24.
 
 For implementation details and design choices, see
-[../docs/implemention.md](../docs/implemention.md).
+[../docs/implementation.md](../docs/implementation.md).
 
 ## Install
 

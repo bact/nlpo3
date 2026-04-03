@@ -165,8 +165,12 @@ fn find_best_break_point(
     }
 
     // Look for whitespace breaks (priority: high)
-    if let Some(idx) = search_range.rfind(|c: char| c.is_whitespace()) {
-        let space_byte = search_start_byte + idx;
+    if let Some((byte_idx, _)) = search_range
+        .char_indices()
+        .rev()
+        .find(|(_, c)| c.is_whitespace())
+    {
+        let space_byte = search_start_byte + byte_idx;
         if let Some(char_idx) = index.byte_to_char(
             space_byte.saturating_add(get_char_at_offset(text, space_byte).len_utf8()),
         ) && is_valid_break_point(tcc_positions, char_idx)
