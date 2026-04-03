@@ -59,6 +59,8 @@ pub fn split_text_into_chunks<'a>(
     target_chunk_size: usize,
     valid_break_points: &[usize],
 ) -> Vec<&'a str> {
+    debug_assert!(valid_break_points.windows(2).all(|w| w[0] <= w[1]));
+
     if target_chunk_size == 0 {
         return vec![text];
     }

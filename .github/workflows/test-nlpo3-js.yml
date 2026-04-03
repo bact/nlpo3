@@ -67,6 +67,6 @@ jobs:
       - name: Test publish
         run: npm pack --dry-run
         if: matrix.os == 'ubuntu-latest' && matrix.node-version == '22.x'
-        
+
       - name: Test
         run: npm test

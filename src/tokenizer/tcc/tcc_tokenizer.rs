@@ -77,6 +77,12 @@ pub fn tcc_pos(text: &str) -> Vec<usize> {
             }
         }
     }
+
+    // The tokenizer relies on binary search over this output in hot paths.
+    // Keep this invariant explicit for maintenance and refactors.
+    debug_assert!(positions.windows(2).all(|w| w[0] < w[1]));
+    debug_assert!(positions.last().copied().unwrap_or(0) <= total_chars);
+
     positions
 }
 
@@ -115,5 +121,16 @@ mod tests {
         assert!(gen_result.contains(&11), "expected 11");
         assert!(gen_result.contains(&12), "expected 12");
         assert!(gen_result.contains(&15), "expected 15");
+    }
+
+    #[test]
+    fn test_tcc_pos_is_strictly_increasing_and_in_bounds() {
+        let text = "ภาษาไทยภาษาไทยABC123";
+        let positions = tcc_pos(text);
+        let total_chars = text.chars().count();
+
+        assert!(positions.windows(2).all(|w| w[0] < w[1]));
+        assert!(positions.iter().all(|&p| p > 0 && p <= total_chars));
+        assert_eq!(positions.last().copied(), Some(total_chars));
     }
 }

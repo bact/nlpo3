@@ -379,6 +379,7 @@ impl<D: DictBackend> NewmmTokenizer<D> {
 
         // All positions are character indices (not byte offsets).
         let valid_position = tcc_tokenizer::tcc_pos(text.as_str());
+        let is_valid_position = |pos: usize| valid_position.binary_search(&pos).is_ok();
         let text_length = input_char_len;
         let mut position_list: BinaryHeap<CharacterIndex, MinComparator> = BinaryHeap::new_min();
         let mut existing_candidate: HashSet<CharacterIndex> = HashSet::default();
@@ -395,10 +396,7 @@ impl<D: DictBackend> NewmmTokenizer<D> {
             let prefixes = custom_dict.prefix_lengths_of(&sub_text_prefix);
             for word_length in prefixes {
                 let end_position_candidate = begin_position + word_length;
-                if valid_position
-                    .binary_search(&end_position_candidate)
-                    .is_ok()
-                {
+                if is_valid_position(end_position_candidate) {
                     graph
                         .entry(begin_position)
                         .or_default()
@@ -450,13 +448,13 @@ impl<D: DictBackend> NewmmTokenizer<D> {
                     None => {
                         let mut finish_without_break = true;
                         for position in begin_position + 1..text_length {
-                            if valid_position.contains(&position) {
+                            if is_valid_position(position) {
                                 let prefix = text.substring(position, text_length);
 
                                 let list_of_prefixes = custom_dict.prefix_lengths_of(&prefix);
                                 let valid_word_filter = |word_length: &usize| {
                                     let new_position = position + word_length;
-                                    let is_valid = valid_position.contains(&new_position);
+                                    let is_valid = is_valid_position(new_position);
                                     let word_str =
                                         text.substring_as_str(position, position + word_length);
                                     let is_two_thai_chars =

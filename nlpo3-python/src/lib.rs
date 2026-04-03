@@ -98,8 +98,11 @@ impl PyNewmmTokenizer {
         if text.is_empty() {
             return Ok(vec![]);
         }
-        py.detach(|| self.inner.segment_with_options(text, safe, parallel_chunk_size))
-            .map_err(|e| exceptions::PyRuntimeError::new_err(format!("segmentation failed: {}", e)))
+        py.detach(|| {
+            self.inner
+                .segment_with_options(text, safe, parallel_chunk_size)
+        })
+        .map_err(|e| exceptions::PyRuntimeError::new_err(format!("segmentation failed: {}", e)))
     }
 }
 
@@ -180,8 +183,11 @@ impl PyNewmmFstTokenizer {
         if text.is_empty() {
             return Ok(vec![]);
         }
-        py.detach(|| self.inner.segment_with_options(text, safe, parallel_chunk_size))
-            .map_err(|e| exceptions::PyRuntimeError::new_err(format!("tokenization failed: {}", e)))
+        py.detach(|| {
+            self.inner
+                .segment_with_options(text, safe, parallel_chunk_size)
+        })
+        .map_err(|e| exceptions::PyRuntimeError::new_err(format!("tokenization failed: {}", e)))
     }
 }
 

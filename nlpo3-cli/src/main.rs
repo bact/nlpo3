@@ -17,8 +17,7 @@ enum TokenizerWrapper {
     Deepcut(DeepcutTokenizer),
 }
 
-const DEFAULT_DICT: &str =
-    include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../words_th.txt"));
+const DEFAULT_DICT: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../words_th.txt"));
 const DEFAULT_PARALLEL_CHUNK_SIZE_STR: &str = "65536";
 
 #[derive(Parser, Debug)]
@@ -125,20 +124,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let line = line_opt?;
         let cleaned_line = line.trim_end_matches('\n');
         let toks = match &tokenizer {
-            TokenizerWrapper::Newmm(tok) => {
-                tok.segment_with_options(
-                    cleaned_line,
-                    segment_opts.safe,
-                    segment_opts.parallel_chunk_size,
-                )?
-            }
-            TokenizerWrapper::Nf(tok) => {
-                tok.segment_with_options(
-                    cleaned_line,
-                    segment_opts.safe,
-                    segment_opts.parallel_chunk_size,
-                )?
-            }
+            TokenizerWrapper::Newmm(tok) => tok.segment_with_options(
+                cleaned_line,
+                segment_opts.safe,
+                segment_opts.parallel_chunk_size,
+            )?,
+            TokenizerWrapper::Nf(tok) => tok.segment_with_options(
+                cleaned_line,
+                segment_opts.safe,
+                segment_opts.parallel_chunk_size,
+            )?,
             #[cfg(feature = "deepcut")]
             TokenizerWrapper::Deepcut(tok) => {
                 tok.segment_with_options(cleaned_line, segment_opts.parallel_chunk_size)?
