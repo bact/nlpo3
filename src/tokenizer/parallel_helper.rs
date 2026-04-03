@@ -89,8 +89,14 @@ pub fn split_text_into_chunks<'a>(
             chunks.push(&text[start_byte..break_byte]);
             start = break_pos;
         } else {
-            // Fallback: if no valid break point found, move forward at least 1 char
-            start += 1.max((target_chunk_size / 4).max(1));
+            // Fallback: preserve text and make forward progress.
+            let fallback_break_pos =
+                find_next_break_in_range(&sorted_break_points, start.saturating_add(1), char_count)
+                    .unwrap_or((start + 1).min(char_count));
+            let start_byte = index.char_to_byte(start);
+            let break_byte = index.char_to_byte(fallback_break_pos);
+            chunks.push(&text[start_byte..break_byte]);
+            start = fallback_break_pos;
         }
     }
     chunks
@@ -130,7 +136,7 @@ fn find_best_break_point(
 
     let search_range = &text[search_start_byte..search_end_byte];
 
-    let best_pos = target_end; // fallback
+    let best_pos = start; // fallback to "no decision"
 
     // Look for punctuation breaks (priority: highest)
     if let Some(idx) = search_range.rfind(|c: char| matches!(c, '。' | '!' | '?' | '！' | '？'))
@@ -177,6 +183,15 @@ fn find_best_break_point(
         return pos;
     }
 
+    // Keep boundaries aligned with valid break points by searching forward.
+    if let Some(pos) = find_next_break_in_range(
+        sorted_tcc_positions,
+        target_end.saturating_add(1),
+        index.char_count(),
+    ) {
+        return pos;
+    }
+
     best_pos
 }
 
@@ -193,6 +208,21 @@ fn find_prev_break_in_range(sorted_points: &[usize], start: usize, end: usize) -
 
     let candidate = sorted_points[insertion - 1];
     if candidate >= start {
+        Some(candidate)
+    } else {
+        None
+    }
+}
+
+/// Find the smallest break point within [start, end].
+fn find_next_break_in_range(sorted_points: &[usize], start: usize, end: usize) -> Option<usize> {
+    if sorted_points.is_empty() || start > end {
+        return None;
+    }
+
+    let insertion = sorted_points.partition_point(|&p| p < start);
+    let candidate = sorted_points.get(insertion).copied()?;
+    if candidate <= end {
         Some(candidate)
     } else {
         None
@@ -301,5 +331,24 @@ mod tests {
         assert_eq!(find_prev_break_in_range(&sorted, 5, 11), Some(8));
         assert_eq!(find_prev_break_in_range(&sorted, 13, 15), None);
         assert_eq!(find_prev_break_in_range(&sorted, 0, 2), Some(0));
+    }
+
+    #[test]
+    fn test_find_next_break_in_range() {
+        let sorted = vec![0, 4, 8, 12, 16];
+        assert_eq!(find_next_break_in_range(&sorted, 5, 11), Some(8));
+        assert_eq!(find_next_break_in_range(&sorted, 13, 15), None);
+        assert_eq!(find_next_break_in_range(&sorted, 0, 2), Some(0));
+    }
+
+    #[test]
+    fn test_split_text_sparse_breakpoints_preserves_text() {
+        let text = "ภาษาไทยภาษาไทยภาษาไทยABC";
+        let char_count = text.chars().count();
+        let valid_break_points: FxHashSet<usize> = [0, char_count].into_iter().collect();
+
+        let chunks = split_text_into_chunks(text, 8, &valid_break_points);
+        let rebuilt = chunks.concat();
+        assert_eq!(rebuilt, text);
     }
 }

@@ -553,6 +553,10 @@ impl DeepcutTokenizer {
     ///
     /// - `None`, `0`, or values below `MIN_CHUNK_SIZE` disable parallel mode.
     /// - valid values enable parallel chunk processing for long inputs.
+    ///
+    /// Note: Deepcut feature extraction uses surrounding context, so chunked
+    /// segmentation can differ slightly near chunk boundaries versus full-text
+    /// segmentation.
     pub fn segment_with_options(
         &self,
         text: &str,

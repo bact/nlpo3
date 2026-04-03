@@ -28,6 +28,35 @@ struct TokenizerWrapper {
 
 impl Finalize for TokenizerWrapper {}
 
+fn parse_optional_chunk_size(
+    cx: &mut FunctionContext,
+    arg_index: usize,
+) -> NeonResult<Option<usize>> {
+    let raw = cx.argument::<JsValue>(arg_index)?;
+    if raw.is_a::<JsNull, _>(cx) || raw.is_a::<JsUndefined, _>(cx) {
+        return Ok(None);
+    }
+
+    let num = raw
+        .downcast::<JsNumber, _>(cx)
+        .or_else(|_| cx.throw_error("parallelChunkSize must be a number"))?;
+    let value = num.value(cx);
+    if !value.is_finite() {
+        return cx.throw_error("parallelChunkSize must be a finite number");
+    }
+    if value.fract() != 0.0 {
+        return cx.throw_error("parallelChunkSize must be an integer");
+    }
+    if value < 0.0 {
+        return cx.throw_error("parallelChunkSize must be non-negative");
+    }
+    if value > usize::MAX as f64 {
+        return cx.throw_error("parallelChunkSize is out of range for usize");
+    }
+
+    Ok(Some(value as usize))
+}
+
 // ---------------------------------------------------------------------------
 // Constructor: NewmmTokenizer
 //
@@ -93,17 +122,7 @@ fn newmm_tokenizer_segment(mut cx: FunctionContext) -> JsResult<JsArray> {
     let wrapper = cx.argument::<JsBox<TokenizerWrapper>>(0)?;
     let text = cx.argument::<JsString>(1)?.value(&mut cx);
     let safe = cx.argument::<JsBoolean>(2)?.value(&mut cx);
-    let parallel_chunk_size = if cx.argument::<JsValue>(3)?.is_a::<JsNull, _>(&mut cx)
-        || cx.argument::<JsValue>(3)?.is_a::<JsUndefined, _>(&mut cx)
-    {
-        None
-    } else {
-        let value = cx.argument::<JsNumber>(3)?.value(&mut cx);
-        if value < 0.0 {
-            return cx.throw_error("parallelChunkSize must be non-negative");
-        }
-        Some(value as usize)
-    };
+    let parallel_chunk_size = parse_optional_chunk_size(&mut cx, 3)?;
 
     let tok = match &wrapper.inner {
         TokenizerInner::Newmm(tok) => tok,
@@ -140,17 +159,7 @@ fn newmm_fst_tokenizer_segment(mut cx: FunctionContext) -> JsResult<JsArray> {
     let wrapper = cx.argument::<JsBox<TokenizerWrapper>>(0)?;
     let text = cx.argument::<JsString>(1)?.value(&mut cx);
     let safe = cx.argument::<JsBoolean>(2)?.value(&mut cx);
-    let parallel_chunk_size = if cx.argument::<JsValue>(3)?.is_a::<JsNull, _>(&mut cx)
-        || cx.argument::<JsValue>(3)?.is_a::<JsUndefined, _>(&mut cx)
-    {
-        None
-    } else {
-        let value = cx.argument::<JsNumber>(3)?.value(&mut cx);
-        if value < 0.0 {
-            return cx.throw_error("parallelChunkSize must be non-negative");
-        }
-        Some(value as usize)
-    };
+    let parallel_chunk_size = parse_optional_chunk_size(&mut cx, 3)?;
 
     let tok = match &wrapper.inner {
         TokenizerInner::NewmmFst(tok) => tok,
@@ -185,17 +194,7 @@ fn newmm_fst_tokenizer_segment(mut cx: FunctionContext) -> JsResult<JsArray> {
 fn deepcut_tokenizer_segment(mut cx: FunctionContext) -> JsResult<JsArray> {
     let wrapper = cx.argument::<JsBox<TokenizerWrapper>>(0)?;
     let text = cx.argument::<JsString>(1)?.value(&mut cx);
-    let parallel_chunk_size = if cx.argument::<JsValue>(2)?.is_a::<JsNull, _>(&mut cx)
-        || cx.argument::<JsValue>(2)?.is_a::<JsUndefined, _>(&mut cx)
-    {
-        None
-    } else {
-        let value = cx.argument::<JsNumber>(2)?.value(&mut cx);
-        if value < 0.0 {
-            return cx.throw_error("parallelChunkSize must be non-negative");
-        }
-        Some(value as usize)
-    };
+    let parallel_chunk_size = parse_optional_chunk_size(&mut cx, 2)?;
 
     let tok = match &wrapper.inner {
         #[cfg(feature = "deepcut")]
