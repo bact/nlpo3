@@ -57,10 +57,7 @@ impl PyNewmmTokenizer {
         NewmmTokenizer::new(dict_path)
             .map(|inner| PyNewmmTokenizer { inner })
             .map_err(|e| {
-                exceptions::PyRuntimeError::new_err(format!(
-                    "failed to load dictionary: {}",
-                    e
-                ))
+                exceptions::PyRuntimeError::new_err(format!("failed to load dictionary: {}", e))
             })
     }
 
@@ -99,9 +96,7 @@ impl PyNewmmTokenizer {
         }
         self.inner
             .segment_with_options(text, safe, parallel_chunk_size)
-            .map_err(|e| {
-                exceptions::PyRuntimeError::new_err(format!("segmentation failed: {}", e))
-            })
+            .map_err(|e| exceptions::PyRuntimeError::new_err(format!("segmentation failed: {}", e)))
     }
 }
 
@@ -142,10 +137,7 @@ impl PyNewmmFstTokenizer {
         NewmmFstTokenizer::new(dict_path)
             .map(|inner| PyNewmmFstTokenizer { inner })
             .map_err(|e| {
-                exceptions::PyRuntimeError::new_err(format!(
-                    "failed to load dictionary: {}",
-                    e
-                ))
+                exceptions::PyRuntimeError::new_err(format!("failed to load dictionary: {}", e))
             })
     }
 
@@ -183,9 +175,7 @@ impl PyNewmmFstTokenizer {
         }
         self.inner
             .segment_with_options(text, safe, parallel_chunk_size)
-            .map_err(|e| {
-                exceptions::PyRuntimeError::new_err(format!("tokenization failed: {}", e))
-            })
+            .map_err(|e| exceptions::PyRuntimeError::new_err(format!("tokenization failed: {}", e)))
     }
 }
 
@@ -274,18 +264,16 @@ impl PyDeepcutTokenizer {
     /// Raises:
     ///     RuntimeError: If ONNX inference fails.
     #[pyo3(signature = (text, parallel_chunk_size = None))]
-    fn segment(
-        &self,
-        text: &str,
-        parallel_chunk_size: Option<usize>,
-    ) -> PyResult<Vec<String>> {
+    fn segment(&self, text: &str, parallel_chunk_size: Option<usize>) -> PyResult<Vec<String>> {
         if text.is_empty() {
             return Ok(vec![]);
         }
 
-        self.inner.segment_with_options(text, parallel_chunk_size).map_err(|e| {
-            exceptions::PyRuntimeError::new_err(format!("deepcut: inference failed: {}", e))
-        })
+        self.inner
+            .segment_with_options(text, parallel_chunk_size)
+            .map_err(|e| {
+                exceptions::PyRuntimeError::new_err(format!("deepcut: inference failed: {}", e))
+            })
     }
 }
 

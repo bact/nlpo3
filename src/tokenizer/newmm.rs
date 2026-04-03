@@ -263,11 +263,15 @@ impl NewmmFstTokenizer {
     }
 
     /// Segment text to string with default options (safe=false, parallel disabled).
+    ///
+    /// If tokenization fails, returns an empty vector.
     pub fn segment_to_string(&self, text: &str) -> Vec<String> {
         self.segment_to_string_with_options(text, false, None)
     }
 
     /// Segment text to string with explicit options.
+    ///
+    /// If tokenization fails, returns an empty vector.
     pub fn segment_to_string_with_options(
         &self,
         text: &str,
@@ -285,7 +289,7 @@ impl Tokenizer for NewmmFstTokenizer {
     }
 
     fn segment_to_string(&self, text: &str) -> Vec<String> {
-        self.segment(text).unwrap()
+        self.segment(text).unwrap_or_default()
     }
 }
 
@@ -609,11 +613,15 @@ impl<D: DictBackend> NewmmTokenizer<D> {
     }
 
     /// Segment text to string with default options (safe=false, parallel disabled).
+    ///
+    /// If tokenization fails, returns an empty vector.
     pub fn segment_to_string(&self, text: &str) -> Vec<String> {
         self.segment_to_string_with_options(text, false, None)
     }
 
     /// Segment text to string with explicit options.
+    ///
+    /// If tokenization fails, returns an empty vector.
     pub fn segment_to_string_with_options(
         &self,
         text: &str,
@@ -626,7 +634,7 @@ impl<D: DictBackend> NewmmTokenizer<D> {
             safe,
             parallel_chunk_size,
         )
-        .unwrap()
+        .unwrap_or_default()
     }
 }
 
@@ -636,6 +644,74 @@ impl<D: DictBackend> Tokenizer for NewmmTokenizer<D> {
     }
 
     fn segment_to_string(&self, text: &str) -> Vec<String> {
-        self.segment(text).unwrap()
+        self.segment(text).unwrap_or_default()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample_word_list() -> Vec<String> {
+        vec![
+            "ภาษา".to_string(),
+            "ไทย".to_string(),
+            "ทดสอบ".to_string(),
+            "การ".to_string(),
+            "ตัด".to_string(),
+            "คำ".to_string(),
+        ]
+    }
+
+    #[test]
+    fn newmm_defaults_match_explicit_options() {
+        let tok = NewmmTokenizer::from_word_list(sample_word_list());
+        let text = "ภาษาไทยทดสอบการตัดคำ";
+
+        let via_default = tok.segment_to_string(text);
+        let via_explicit = tok.segment_to_string_with_options(text, false, None);
+        let via_result = tok
+            .segment_with_options(text, false, None)
+            .unwrap_or_default();
+
+        assert_eq!(via_default, via_explicit);
+        assert_eq!(via_explicit, via_result);
+    }
+
+    #[test]
+    fn newmm_trait_and_inherent_segment_to_string_are_consistent() {
+        let tok = NewmmTokenizer::from_word_list(sample_word_list());
+        let text = "ภาษาไทยทดสอบการตัดคำ";
+
+        let via_inherent = tok.segment_to_string(text);
+        let via_trait = <NewmmTokenizer<TrieChar> as Tokenizer>::segment_to_string(&tok, text);
+
+        assert_eq!(via_inherent, via_trait);
+    }
+
+    #[test]
+    fn newmm_fst_defaults_match_explicit_options() {
+        let tok = NewmmFstTokenizer::from_word_list(sample_word_list()).unwrap();
+        let text = "ภาษาไทยทดสอบการตัดคำ";
+
+        let via_default = tok.segment_to_string(text);
+        let via_explicit = tok.segment_to_string_with_options(text, false, None);
+        let via_result = tok
+            .segment_with_options(text, false, None)
+            .unwrap_or_default();
+
+        assert_eq!(via_default, via_explicit);
+        assert_eq!(via_explicit, via_result);
+    }
+
+    #[test]
+    fn newmm_fst_trait_and_inherent_segment_to_string_are_consistent() {
+        let tok = NewmmFstTokenizer::from_word_list(sample_word_list()).unwrap();
+        let text = "ภาษาไทยทดสอบการตัดคำ";
+
+        let via_inherent = tok.segment_to_string(text);
+        let via_trait = <NewmmFstTokenizer as Tokenizer>::segment_to_string(&tok, text);
+
+        assert_eq!(via_inherent, via_trait);
     }
 }
