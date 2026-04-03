@@ -115,7 +115,8 @@ The 3-char prefix is measured in Unicode codepoints. For Thai, each codepoint is
 one character (consonant, vowel mark, or tone mark), so a 3-codepoint prefix
 captures roughly the first syllable onset and provides a meaningful grouping.
 
-All three files have at most one word per prefix group. `10k.txt` requires a
+`500-short.txt` and `500-long.txt` have at most one word per prefix group.
+`10k.txt` also starts with one word per distinct prefix group, but it requires a
 second pass for ~318 slots after exhausting all ~9,700 distinct prefixes in the
 source dictionary, so a small minority of prefixes contribute 2 words.
 
