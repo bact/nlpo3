@@ -5,7 +5,7 @@
  * Opaque handle to a Rust tokenizer instance.
  *
  * Returned by the constructor functions below and consumed by
- * {@link tokenizerSegment}.  Because the underlying tokenizer is read-only
+ * tokenizer-specific segment functions. Because the underlying tokenizer is read-only
  * after construction, the same handle may be passed to {@link tokenizerSegment}
  * any number of times — the dictionary is never reloaded or copied.
  */
@@ -41,22 +41,53 @@ export function newmmFstTokenizerNew(dictPath: string): TokenizerHandle;
 export function deepcutTokenizerNew(): TokenizerHandle;
 
 /**
- * Tokenize `text` using a previously created tokenizer handle.
+ * Tokenize `text` using a NewmmTokenizer handle.
  *
  * The tokenizer is read-only — reusing the same handle for every call is both
  * safe and efficient (the dictionary is loaded only once).
  *
- * @param handle    Handle returned by one of the constructor functions.
+ * @param handle    Handle returned by {@link newmmTokenizerNew}.
  * @param text      Input text to tokenize.
  * @param safe      Enable safe mode (avoids long run times on ambiguous input).
- *                  Ignored by DeepcutTokenizer.
- * @param parallel  Enable parallel processing (uses more memory).
- *                  Ignored by DeepcutTokenizer.
+ * @param parallelChunkSize Target chunk size in bytes for parallel mode.
+ *                  `null`, `undefined`, `0`, or values below minimum disable parallel mode.
  * @returns         Array of word tokens.
  */
-export function tokenizerSegment(
+export function newmmTokenizerSegment(
     handle: TokenizerHandle,
     text: string,
     safe: boolean,
-    parallel: boolean,
+    parallelChunkSize?: number | null,
+): string[];
+
+/**
+ * Tokenize `text` using a NewmmFstTokenizer handle.
+ *
+ * @param handle    Handle returned by {@link newmmFstTokenizerNew}.
+ * @param text      Input text to tokenize.
+ * @param safe      Enable safe mode (avoids long run times on ambiguous input).
+ * @param parallelChunkSize Target chunk size in bytes for parallel mode.
+ *                  `null`, `undefined`, `0`, or values below minimum disable parallel mode.
+ * @returns         Array of word tokens.
+ */
+export function newmmFstTokenizerSegment(
+    handle: TokenizerHandle,
+    text: string,
+    safe: boolean,
+    parallelChunkSize?: number | null,
+): string[];
+
+/**
+ * Tokenize `text` using a DeepcutTokenizer handle.
+ *
+ * @param handle    Handle returned by {@link deepcutTokenizerNew}.
+ * @param text      Input text to tokenize.
+ * @param parallelChunkSize Target chunk size in bytes for parallel mode.
+ *                  `null`, `undefined`, `0`, or values below minimum disable parallel mode.
+ * @returns         Array of word tokens.
+ */
+export function deepcutTokenizerSegment(
+    handle: TokenizerHandle,
+    text: string,
+    parallelChunkSize?: number | null,
 ): string[];

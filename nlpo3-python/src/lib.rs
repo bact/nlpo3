@@ -27,18 +27,20 @@ use pyo3::prelude::*;
 /// single instance and hold a reference to it from each caller — no copying
 /// of the dictionary occurs.
 ///
-/// Example::
+/// Example:
 ///
-///     from nlpo3 import NewmmTokenizer
+/// ```python
+/// from nlpo3 import NewmmTokenizer
 ///
-///     tok = NewmmTokenizer("path/to/dict.txt")
-///     tokens = tok.segment("สวัสดีครับ")
+/// tok = NewmmTokenizer("path/to/dict.txt")
+/// tokens = tok.segment("สวัสดีครับ")
 ///
-///     # safe=True avoids long run times on ambiguous input
-///     tokens = tok.segment("สวัสดีครับ", safe=True)
+/// # safe=True avoids long run times on ambiguous input
+/// tokens = tok.segment("สวัสดีครับ", safe=True)
 ///
-///     # parallel=True enables multi-threaded segmentation (higher memory use)
-///     tokens = tok.segment("สวัสดีครับ", parallel=True)
+/// # parallel_chunk_size enables chunk-based parallel processing
+/// tokens = tok.segment("สวัสดีครับ", parallel_chunk_size=16_384)
+/// ```
 #[pyclass(name = "NewmmTokenizer", frozen)]
 struct PyNewmmTokenizer {
     inner: NewmmTokenizer,
@@ -110,12 +112,14 @@ impl PyNewmmTokenizer {
 /// The instance is read-only after construction and safe to call from
 /// multiple threads concurrently without any locking.
 ///
-/// Example::
+/// Example:
 ///
-///     from nlpo3 import NewmmFstTokenizer
+/// ```python
+/// from nlpo3 import NewmmFstTokenizer
 ///
-///     tok = NewmmFstTokenizer("path/to/dict.txt")
-///     tokens = tok.segment("สวัสดีครับ")
+/// tok = NewmmFstTokenizer("path/to/dict.txt")
+/// tokens = tok.segment("สวัสดีครับ")
+/// ```
 #[pyclass(name = "NewmmFstTokenizer", frozen)]
 struct PyNewmmFstTokenizer {
     inner: NewmmFstTokenizer,
@@ -186,17 +190,19 @@ impl PyNewmmFstTokenizer {
 /// For distributed or parallel workloads, create one instance per worker
 /// process to avoid sharing state across process boundaries.
 ///
-/// Example::
+/// Example:
 ///
-///     from nlpo3 import DeepcutTokenizer
+/// ```python
+/// from nlpo3 import DeepcutTokenizer
 ///
-///     # Use the bundled default model
-///     tok = DeepcutTokenizer()
-///     tokens = tok.segment("สวัสดีครับ")
+/// # Use the bundled default model
+/// tok = DeepcutTokenizer()
+/// tokens = tok.segment("สวัสดีครับ")
 ///
-///     # Use a custom ONNX model file
-///     tok = DeepcutTokenizer(model_path="/path/to/custom.onnx")
-///     tokens = tok.segment("สวัสดีครับ")
+/// # Use a custom ONNX model file
+/// tok = DeepcutTokenizer(model_path="/path/to/custom.onnx")
+/// tokens = tok.segment("สวัสดีครับ")
+/// ```
 #[pyclass(name = "DeepcutTokenizer", frozen)]
 struct PyDeepcutTokenizer {
     inner: DeepcutTokenizer,

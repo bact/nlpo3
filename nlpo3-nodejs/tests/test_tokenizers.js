@@ -52,9 +52,9 @@ describe("NewmmTokenizer", () => {
         assert.ok(Array.isArray(tok.segment("ไข่คน", { safe: true })));
     });
 
-    test("segment with parallel=true returns an array", () => {
+    test("segment with parallelChunkSize returns an array", () => {
         const tok = new NewmmTokenizer(DICT_PATH);
-        assert.ok(Array.isArray(tok.segment("ไข่คน", { parallel: true })));
+        assert.ok(Array.isArray(tok.segment("ไข่คน", { parallelChunkSize: 16384 })));
     });
 
     test("same instance reused across many calls", () => {

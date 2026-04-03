@@ -51,10 +51,9 @@ const tokensDeepcut = deepcut.segment("สวัสดีครับ");
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `safe` | `boolean` | `false` | For `NewmmTokenizer` and `NewmmFstTokenizer`: avoid long run times on inputs with many ambiguous word boundaries |
-| `parallel` | `boolean` | `false` | For `NewmmTokenizer` and `NewmmFstTokenizer`: use Rayon to process a large input in parallel chunks (higher memory use) |
+| `parallelChunkSize` | `number \| undefined` | `undefined` | For `NewmmTokenizer` and `NewmmFstTokenizer`: target chunk size in bytes for chunked parallel processing; `undefined`, `0`, or low values disable parallel mode |
 
-`DeepcutTokenizer.segment()` in Node.js currently uses a fixed path and does
-not accept segment options.
+`DeepcutTokenizer.segment(text, parallelChunkSize?)` supports optional chunk-size configuration.
 
 [tcc]: https://dl.acm.org/doi/10.1145/355214.355225
 

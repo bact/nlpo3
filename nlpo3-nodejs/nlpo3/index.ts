@@ -21,11 +21,10 @@ export interface SegmentOptions {
      */
     safe?: boolean;
     /**
-     * Enable parallel (multi-threaded) processing.  Uses more memory; benefits
-     * long texts on multi-core hosts.
-     * Default: `false`.
+     * Target chunk size in bytes for parallel processing.
+     * `undefined`, `0`, or too-small values disable parallel mode.
      */
-    parallel?: boolean;
+    parallelChunkSize?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -51,7 +50,7 @@ export interface SegmentOptions {
  *
  * // Reuse tok for every request — the dictionary is never reloaded.
  * const tokens = tok.segment("สวัสดีครับ");
- * const tokensParallel = tok.segment("สวัสดีครับ", { parallel: true });
+ * const tokensParallel = tok.segment("สวัสดีครับ", { parallelChunkSize: 16384 });
  * ```
  */
 export class NewmmTokenizer {
@@ -72,8 +71,8 @@ export class NewmmTokenizer {
      * @returns        Array of word tokens.
      */
     segment(text: string, options: SegmentOptions = {}): string[] {
-        const { safe = false, parallel = false } = options;
-        return native.tokenizerSegment(this._handle, text, safe, parallel);
+        const { safe = false, parallelChunkSize } = options;
+        return native.newmmTokenizerSegment(this._handle, text, safe, parallelChunkSize ?? null);
     }
 }
 
@@ -116,8 +115,8 @@ export class NewmmFstTokenizer {
      * @returns        Array of word tokens.
      */
     segment(text: string, options: SegmentOptions = {}): string[] {
-        const { safe = false, parallel = false } = options;
-        return native.tokenizerSegment(this._handle, text, safe, parallel);
+        const { safe = false, parallelChunkSize } = options;
+        return native.newmmFstTokenizerSegment(this._handle, text, safe, parallelChunkSize ?? null);
     }
 }
 
@@ -156,7 +155,7 @@ export class DeepcutTokenizer {
      * @param text  Input text.
      * @returns     Array of word tokens.
      */
-    segment(text: string): string[] {
-        return native.tokenizerSegment(this._handle, text, false, false);
+    segment(text: string, parallelChunkSize?: number): string[] {
+        return native.deepcutTokenizerSegment(this._handle, text, parallelChunkSize ?? null);
     }
 }

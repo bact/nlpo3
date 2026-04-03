@@ -182,7 +182,15 @@ fn bench_full_tokenization(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("NewmmTokenizer/safe=true", label),
             text,
-            |b, t| b.iter(|| black_box(tok_trie.segment_with_options(black_box(t), true, false).unwrap())),
+            |b, t| {
+                b.iter(|| {
+                    black_box(
+                        tok_trie
+                            .segment_with_options(black_box(t), true, None)
+                            .unwrap(),
+                    )
+                })
+            },
         );
 
         // NewmmFstTokenizer — CharString + FstDict (memory-efficient)
@@ -194,7 +202,15 @@ fn bench_full_tokenization(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("NewmmFstTokenizer/safe=true", label),
             text,
-            |b, t| b.iter(|| black_box(tok_fst.segment_with_options(black_box(t), true, false).unwrap())),
+            |b, t| {
+                b.iter(|| {
+                    black_box(
+                        tok_fst
+                            .segment_with_options(black_box(t), true, None)
+                            .unwrap(),
+                    )
+                })
+            },
         );
 
         // DeepcutTokenizer — CNN/ONNX (only with --features deepcut)

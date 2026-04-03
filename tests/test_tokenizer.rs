@@ -6,7 +6,6 @@
  */
 use nlpo3::tokenizer::newmm::NewmmTokenizer;
 
-
 const FIRST_TEXT: &str = "นิสสันผ่อนจนเพลียนาวาร่า..";
 const SECOND_TEXT: &str =
     "อาชญากรรมทางการแพทย์.. หลอกลวงคนไข้ผ่าตัด ตัดหมอนรองข้อเข่าอำพราง รพ.กรุงเทพภูเก็ตปลอมเวชระเบียน ตอนที่๑.";
@@ -177,10 +176,10 @@ fn test_long_text_byte_tokenizer() {
 
     let tokenizer = NewmmTokenizer::new(&relative_dict_path).unwrap();
     let result = tokenizer
-        .segment_with_options(&text, false, Some(5_000))
+        .segment_with_options(&text, false, Some(16_384))
         .unwrap();
     let safe_result = tokenizer
-        .segment_with_options(&text, true, Some(5_000))
+        .segment_with_options(&text, true, Some(16_384))
         .unwrap();
     assert_eq!(result.len(), 1889);
     assert_eq!(safe_result.len(), 1991);
@@ -196,26 +195,11 @@ fn test_standard_short_word() {
         tokenizer.segment_to_string("1) ประมวลผลภาษาไทย"),
         ["1", ")", " ", "ประมวลผล", "ภาษาไทย"]
     );
-    assert_eq!(
-        tokenizer.segment_to_string("มาตรา39"),
-        ["มาตรา", "39"]
-    );
-    assert_eq!(
-        tokenizer.segment_to_string("19..."),
-        ["19", "..."]
-    );
-    assert_eq!(
-        tokenizer.segment_to_string("19."),
-        ["19", "."]
-    );
-    assert_eq!(
-        tokenizer.segment_to_string("19.84"),
-        ["19.84"]
-    );
-    assert_eq!(
-        tokenizer.segment_to_string("127.0.0.1"),
-        ["127.0.0.1"]
-    );
+    assert_eq!(tokenizer.segment_to_string("มาตรา39"), ["มาตรา", "39"]);
+    assert_eq!(tokenizer.segment_to_string("19..."), ["19", "..."]);
+    assert_eq!(tokenizer.segment_to_string("19."), ["19", "."]);
+    assert_eq!(tokenizer.segment_to_string("19.84"), ["19.84"]);
+    assert_eq!(tokenizer.segment_to_string("127.0.0.1"), ["127.0.0.1"]);
     assert_eq!(
         tokenizer.segment_to_string("USD1,984.42"),
         ["USD", "1,984.42"]
@@ -288,22 +272,10 @@ fn test_thai_number() {
     relative_dict_path.push_str(DEFAULT_DICT_PATH);
 
     let tokenizer = NewmmTokenizer::new(&relative_dict_path).unwrap();
-    assert_eq!(
-        tokenizer.segment_to_string("๑๙..."),
-        ["๑๙", "..."]
-    );
-    assert_eq!(
-        tokenizer.segment_to_string("๑๙."),
-        ["๑๙", "."]
-    );
-    assert_eq!(
-        tokenizer.segment_to_string("๑๙.๘๔"),
-        ["๑๙.๘๔"]
-    );
-    assert_eq!(
-        tokenizer.segment_to_string("๑๒๗.๐.๐.๑"),
-        ["๑๒๗.๐.๐.๑"]
-    );
+    assert_eq!(tokenizer.segment_to_string("๑๙..."), ["๑๙", "..."]);
+    assert_eq!(tokenizer.segment_to_string("๑๙."), ["๑๙", "."]);
+    assert_eq!(tokenizer.segment_to_string("๑๙.๘๔"), ["๑๙.๘๔"]);
+    assert_eq!(tokenizer.segment_to_string("๑๒๗.๐.๐.๑"), ["๑๒๗.๐.๐.๑"]);
     assert_eq!(
         tokenizer.segment_to_string("USD๑,๙๘๔.๔๒"),
         ["USD", "๑,๙๘๔.๔๒"]
@@ -365,10 +337,7 @@ fn test_tokenizer_trait_switchable() {
     let trie: Box<dyn Tokenizer> = Box::new(NewmmTokenizer::new(&path).unwrap());
     let fst: Box<dyn Tokenizer> = Box::new(NewmmFstTokenizer::new(&path).unwrap());
     let text = "สวัสดีประเทศไทย";
-    assert_eq!(
-        trie.segment_to_string(text),
-        fst.segment_to_string(text),
-    );
+    assert_eq!(trie.segment_to_string(text), fst.segment_to_string(text),);
 }
 
 /// Regression test for BFS path explosion in `bfs_paths_graph`.

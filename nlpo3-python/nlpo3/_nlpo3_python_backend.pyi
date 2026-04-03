@@ -43,7 +43,7 @@ class NewmmTokenizer:
         self,
         text: str,
         safe: bool = False,
-        parallel: bool = False,
+        parallel_chunk_size: Optional[int] = None,
     ) -> List[str]:
         """Tokenize text into words.
 
@@ -54,8 +54,8 @@ class NewmmTokenizer:
             text:     Input text to tokenize.
             safe:     Enable safe mode to avoid long run times on inputs with
                       many ambiguous word boundaries (default: False).
-            parallel: Enable multi-threaded processing (default: False).
-                      Uses more memory; benefits long texts on multi-core hosts.
+            parallel_chunk_size: Target chunk size in bytes for chunked parallel
+                      processing. `None`, `0`, or low values disable parallel mode.
 
         Returns:
             List of word tokens.
@@ -98,7 +98,7 @@ class NewmmFstTokenizer:
         self,
         text: str,
         safe: bool = False,
-        parallel: bool = False,
+        parallel_chunk_size: Optional[int] = None,
     ) -> List[str]:
         """Tokenize text into words.
 
@@ -108,7 +108,8 @@ class NewmmFstTokenizer:
         Args:
             text:     Input text to tokenize.
             safe:     Enable safe mode (default: False).
-            parallel: Enable multi-threaded processing (default: False).
+            parallel_chunk_size: Target chunk size in bytes for chunked parallel
+                      processing. `None`, `0`, or low values disable parallel mode.
 
         Returns:
             List of word tokens.
@@ -152,7 +153,7 @@ class DeepcutTokenizer:
         """
         ...
 
-    def segment(self, text: str) -> List[str]:
+    def segment(self, text: str, parallel_chunk_size: Optional[int] = None) -> List[str]:
         """Tokenize text using the deepcut CNN model.
 
         Inference is thread-safe: the same instance may be called concurrently
@@ -160,6 +161,8 @@ class DeepcutTokenizer:
 
         Args:
             text: Input text to tokenize.
+            parallel_chunk_size: Target chunk size in bytes for chunked parallel
+                        processing. `None`, `0`, or low values disable parallel mode.
 
         Returns:
             List of word tokens.

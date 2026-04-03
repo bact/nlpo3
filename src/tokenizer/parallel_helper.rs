@@ -38,13 +38,8 @@ pub fn split_text_into_chunks<'a>(
         let target_end = start + (target_chunk_size / 4); // rough estimate: ~4 bytes per Thai char
         let target_end = target_end.min(char_count);
         // Find the best break point near the target
-        let break_pos = find_best_break_point(
-            text,
-            start,
-            target_end,
-            valid_break_points,
-            char_count,
-        );
+        let break_pos =
+            find_best_break_point(text, start, target_end, valid_break_points, char_count);
         // Extract chunk from start to break_pos (in byte offsets)
         if break_pos > start {
             let start_byte = char_index_to_byte_offset(text, start);
@@ -95,7 +90,8 @@ fn find_best_break_point(
     let best_pos = target_end; // fallback
 
     // Look for punctuation breaks (priority: highest)
-    if let Some(idx) = search_range.rfind(|c: char| matches!(c, '。' | '!' | '?' | '！' | '？')) {
+    if let Some(idx) = search_range.rfind(|c: char| matches!(c, '。' | '!' | '?' | '！' | '？'))
+    {
         let punct_pos = search_start_byte + idx;
         // Prefer a space after punctuation if available
         if let Some(after) = punct_pos.checked_add(get_char_at_offset(text, punct_pos).len_utf8()) {
@@ -142,10 +138,7 @@ fn find_best_break_point(
 
 /// Convert a character index to a byte offset in the text.
 fn char_index_to_byte_offset(text: &str, char_index: usize) -> usize {
-    text.chars()
-        .take(char_index)
-        .map(|c| c.len_utf8())
-        .sum()
+    text.chars().take(char_index).map(|c| c.len_utf8()).sum()
 }
 
 /// Convert a byte offset to a character index, if valid.
@@ -153,19 +146,12 @@ fn byte_offset_to_char_index(text: &str, byte_offset: usize) -> Option<usize> {
     if byte_offset > text.len() {
         return None;
     }
-    Some(
-        text[..byte_offset]
-            .chars()
-            .count(),
-    )
+    Some(text[..byte_offset].chars().count())
 }
 
 /// Get the character at a byte offset.
 fn get_char_at_offset(text: &str, byte_offset: usize) -> char {
-    text[byte_offset..]
-        .chars()
-        .next()
-        .unwrap_or('\0')
+    text[byte_offset..].chars().next().unwrap_or('\0')
 }
 
 /// Move offset left to the nearest UTF-8 char boundary.
@@ -194,20 +180,14 @@ pub fn tokenize_chunks<F>(
     chunks: Vec<&str>,
     parallel: bool,
     segment_fn: F,
-) -> Vec<Vec<String>>
+) -> anyhow::Result<Vec<Vec<String>>>
 where
     F: Fn(&str) -> anyhow::Result<Vec<String>> + Send + Sync,
 {
     if parallel {
-        chunks
-            .into_par_iter()
-            .map(|chunk| segment_fn(chunk).unwrap_or_default())
-            .collect()
+        chunks.into_par_iter().map(segment_fn).collect()
     } else {
-        chunks
-            .into_iter()
-            .map(|chunk| segment_fn(chunk).unwrap_or_default())
-            .collect()
+        chunks.into_iter().map(segment_fn).collect()
     }
 }
 

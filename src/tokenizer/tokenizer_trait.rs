@@ -22,6 +22,8 @@ pub trait Tokenizer: Send + Sync {
 
     /// Segment text into words, returning a `Vec<String>`.
     ///
-    /// Panics or returns empty on error (use `segment()` for error handling).
+    /// If segmentation fails, behavior is implementation-specific.
+    /// Implementations may panic or return an empty `Vec<String>`.
+    /// Use `segment()` when you need reliable error handling.
     fn segment_to_string(&self, text: &str) -> Vec<String>;
 }

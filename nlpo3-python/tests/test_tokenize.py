@@ -89,7 +89,7 @@ class TestNewmmTokenizer(unittest.TestCase):
         self.assertIsInstance(result, list)
 
     def test_parallel_mode(self):
-        result = self.tok.segment(self.LONG_TEXT, parallel=True)
+        result = self.tok.segment(self.LONG_TEXT, parallel_chunk_size=16_384)
         self.assertIsInstance(result, list)
         self.assertTrue(len(result) > 0)
 
