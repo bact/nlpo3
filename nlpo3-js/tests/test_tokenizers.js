@@ -1,10 +1,8 @@
 // SPDX-FileCopyrightText: 2024-2026 PyThaiNLP Project
 // SPDX-License-Identifier: Apache-2.0
 
-"use strict";
-
 /**
- * Integration tests for the nlpo3-nodejs binding.
+ * Integration tests for the nlpo3 JavaScript binding.
  *
  * Requires the native addon to be built and TypeScript compiled first:
  *   npm run build && tsc
@@ -14,12 +12,14 @@
  * This package supports Node.js 22 and newer.
  */
 
-const assert = require("node:assert/strict");
-const { test, describe } = require("node:test");
-const path = require("node:path");
+import assert from "node:assert/strict";
+import { test, describe } from "node:test";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-const { NewmmTokenizer, NewmmFstTokenizer, DeepcutTokenizer } = require("../nlpo3/index.js");
+import { NewmmTokenizer, NewmmFstTokenizer, DeepcutTokenizer } from "../nlpo3/index.js";
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DICT_PATH = path.join(__dirname, "data", "test_dict.txt");
 
 test("runtime version is supported", () => {

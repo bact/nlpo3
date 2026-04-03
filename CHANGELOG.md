@@ -23,10 +23,10 @@ Major release with breaking changes.
 
 ### Changed
 
-- Improved API consistency for Rust, Python, Node.js, and CLI.
+- Improved API consistency for Rust, JavaScript, Python, and CLI.
 - Improved behavior on difficult and highly ambiguous text.
 - Updated project/toolchain to current major versions (2.0.0 line).
-- **Breaking:** Python and Node.js moved from global/free-function style APIs to
+- **Breaking:** JavaScript and Python moved from global/free-function style APIs to
   class-based tokenizer APIs.
 
 ### Removed
@@ -54,7 +54,7 @@ tok = NewmmTokenizer("path/to/dict.txt")
 tokens = tok.segment("สวัสดีครับ")
 ```
 
-Node.js:
+JavaScript:
 
 ```typescript
 // Before (v1.x)
@@ -62,7 +62,7 @@ loadDict("path/to/dict.txt", "mydict");
 const tokens = segment("สวัสดีครับ", "mydict", false, false);
 
 // Since v2.0.0
-import { NewmmTokenizer } from "nlpo3-nodejs";
+import { NewmmTokenizer } from "nlpo3";
 const tok = new NewmmTokenizer("path/to/dict.txt");
 const tokens = tok.segment("สวัสดีครับ");
 ```

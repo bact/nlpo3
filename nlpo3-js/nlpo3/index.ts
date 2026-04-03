@@ -1,7 +1,14 @@
 // SPDX-FileCopyrightText: 2024-2026 PyThaiNLP Project
 // SPDX-License-Identifier: Apache-2.0
 
-import * as native from "./rust_mod";
+import type { TokenizerHandle } from "./rust_mod";
+import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
+
+const require = createRequire(import.meta.url);
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const native = require(path.join(__dirname, "rust_mod.node")) as typeof import("./rust_mod");
 
 // ---------------------------------------------------------------------------
 // Shared types
@@ -44,7 +51,7 @@ export interface SegmentOptions {
  *
  * @example
  * ```typescript
- * import { NewmmTokenizer } from "nlpo3-nodejs";
+ * import { NewmmTokenizer } from "nlpo3";
  *
  * const tok = new NewmmTokenizer("/path/to/dict.txt");
  *
@@ -54,7 +61,7 @@ export interface SegmentOptions {
  * ```
  */
 export class NewmmTokenizer {
-    private readonly _handle: native.TokenizerHandle;
+    private readonly _handle: TokenizerHandle;
 
     /**
      * @param dictPath  Path to a one-word-per-line dictionary file.
@@ -97,14 +104,14 @@ export class NewmmTokenizer {
  *
  * @example
  * ```typescript
- * import { NewmmFstTokenizer } from "nlpo3-nodejs";
+ * import { NewmmFstTokenizer } from "nlpo3";
  *
  * const tok = new NewmmFstTokenizer("/path/to/dict.txt");
  * const tokens = tok.segment("สวัสดีครับ");
  * ```
  */
 export class NewmmFstTokenizer {
-    private readonly _handle: native.TokenizerHandle;
+    private readonly _handle: TokenizerHandle;
 
     /**
      * @param dictPath  Path to a one-word-per-line dictionary file.
@@ -148,14 +155,14 @@ export class NewmmFstTokenizer {
  *
  * @example
  * ```typescript
- * import { DeepcutTokenizer } from "nlpo3-nodejs";
+ * import { DeepcutTokenizer } from "nlpo3";
  *
  * const tok = new DeepcutTokenizer();
  * const tokens = tok.segment("สวัสดีครับ");
  * ```
  */
 export class DeepcutTokenizer {
-    private readonly _handle: native.TokenizerHandle;
+    private readonly _handle: TokenizerHandle;
 
     constructor() {
         this._handle = native.deepcutTokenizerNew();

@@ -1,4 +1,4 @@
-name: Test nlpo3-nodejs
+name: Test nlpo3-js (JavaScript binding)
 on:
   push:
     branches:
@@ -8,14 +8,14 @@ on:
       - "Cargo.toml"
       - "Cargo.lock"
       - "model/**"
-      - "nlpo3-nodejs/src/**"
-      - "nlpo3-nodejs/nlpo3/**"
-      - "nlpo3-nodejs/tests/**"
-      - "nlpo3-nodejs/Cargo.toml"
-      - "nlpo3-nodejs/package.json"
-      - "nlpo3-nodejs/package-lock.json"
-      - "nlpo3-nodejs/tsconfig.json"
-      - ".github/workflows/test-nlpo3-nodejs.yml"
+      - "nlpo3-js/src/**"
+      - "nlpo3-js/nlpo3/**"
+      - "nlpo3-js/tests/**"
+      - "nlpo3-js/Cargo.toml"
+      - "nlpo3-js/package.json"
+      - "nlpo3-js/package-lock.json"
+      - "nlpo3-js/tsconfig.json"
+      - ".github/workflows/test-nlpo3-js.yml"
   pull_request:
     branches:
       - main
@@ -24,21 +24,21 @@ on:
       - "Cargo.toml"
       - "Cargo.lock"
       - "model/**"
-      - "nlpo3-nodejs/src/**"
-      - "nlpo3-nodejs/nlpo3/**"
-      - "nlpo3-nodejs/tests/**"
-      - "nlpo3-nodejs/Cargo.toml"
-      - "nlpo3-nodejs/package.json"
-      - "nlpo3-nodejs/package-lock.json"
-      - "nlpo3-nodejs/tsconfig.json"
-      - ".github/workflows/test-nlpo3-nodejs.yml"
+      - "nlpo3-js/src/**"
+      - "nlpo3-js/nlpo3/**"
+      - "nlpo3-js/tests/**"
+      - "nlpo3-js/Cargo.toml"
+      - "nlpo3-js/package.json"
+      - "nlpo3-js/package-lock.json"
+      - "nlpo3-js/tsconfig.json"
+      - ".github/workflows/test-nlpo3-js.yml"
 
 defaults:
   run:
-    working-directory: nlpo3-nodejs
+    working-directory: nlpo3-js
 
 jobs:
-  test-nodejs:
+  test-js:
     strategy:
       fail-fast: false
       matrix:
@@ -59,7 +59,7 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
           cache: "npm"
-          cache-dependency-path: nlpo3-nodejs/package-lock.json
+          cache-dependency-path: nlpo3-js/package-lock.json
 
       - name: Install Node.js dependencies
         run: npm ci --ignore-scripts

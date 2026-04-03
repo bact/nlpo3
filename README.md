@@ -9,8 +9,7 @@ SPDX-License-Identifier: Apache-2.0
 [![Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg "Apache-2.0")](https://opensource.org/license/apache-2-0)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.14082448.svg)](https://doi.org/10.5281/zenodo.14082448)
 
-A Thai natural language processing library in Rust, with Python and Node.js
-bindings.
+A Thai natural language processing library in Rust, with JavaScript and Python bindings.
 
 Formerly known as `oxidized-thainlp`, it was originally developed by
 Thanathip Suntorntip.
@@ -32,16 +31,16 @@ Rust:
 cargo add nlpo3
 ```
 
+JavaScript:
+
+```shell
+npm install nlpo3
+```
+
 Python:
 
 ```shell
 pip install nlpo3
-```
-
-Node.js:
-
-```shell
-npm install nlpo3-nodejs
 ```
 
 CLI:
@@ -107,8 +106,8 @@ For technical implementation and design notes, see
 
 ## Bindings
 
+- JavaScript: [nlpo3-js](./nlpo3-js/)
 - Python: [nlpo3-python](./nlpo3-python/)
-- Node.js: [nlpo3-nodejs](./nlpo3-nodejs/)
 - CLI: [nlpo3-cli](./nlpo3-cli/)
 
 ## Dictionary

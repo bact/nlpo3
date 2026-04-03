@@ -3,19 +3,20 @@ SPDX-FileCopyrightText: 2024-2026 PyThaiNLP Project
 SPDX-License-Identifier: Apache-2.0
 ---
 
-# nlpO3 Node.js binding
+# nlpO3 JavaScript binding
 
 [![Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg "Apache-2.0")](https://opensource.org/licenses/Apache-2.0)
 
-Node.js binding for nlpO3 Thai tokenization.
+Rust-powered Thai tokenization library for JavaScript.
 
 ## Overview
 
-- Class-based tokenizer API for Node.js.
+- Pure JavaScript API compatible with traditional JavaScript and TypeScript.
 - Three tokenizer classes:
-  - `NewmmTokenizer`
-  - `NewmmFstTokenizer`
-  - `DeepcutTokenizer`
+  - `NewmmTokenizer` — Dictionary-based maximal-matching tokenizer.
+  - `NewmmFstTokenizer` — FST-accelerated dictionary tokenizer.
+  - `DeepcutTokenizer` — Neural network-based tokenizer.
+- Framework-independent and suitable for any JavaScript environment.
 - Improved runtime stability and long-text handling.
 
 For implementation details and design choices, see
@@ -24,7 +25,7 @@ For implementation details and design choices, see
 ## Install
 
 ```shell
-npm i nlpo3-nodejs
+npm i nlpo3
 ```
 
 ## Requirements
@@ -35,8 +36,10 @@ Tested in CI on Node.js 22.x, 24.x, and `current`.
 
 ## Quick start
 
+### JavaScript (ESM)
+
 ```javascript
-const { NewmmTokenizer, NewmmFstTokenizer, DeepcutTokenizer } = require("nlpo3-nodejs");
+import { NewmmTokenizer, NewmmFstTokenizer, DeepcutTokenizer } from "nlpo3";
 
 const tok = new NewmmTokenizer("/path/to/dict.txt");
 const tokens = tok.segment("สวัสดีครับ");
@@ -46,6 +49,19 @@ const tokensFst = tokFst.segment("สวัสดีครับ");
 
 const deepcut = new DeepcutTokenizer();
 const tokensDeepcut = deepcut.segment("สวัสดีครับ");
+```
+
+### TypeScript
+
+```typescript
+import { NewmmTokenizer, NewmmFstTokenizer, DeepcutTokenizer } from "nlpo3";
+import type { SegmentOptions } from "nlpo3";
+
+const tok = new NewmmTokenizer("/path/to/dict.txt");
+const tokens: string[] = tok.segment("สวัสดีครับ");
+
+const options: SegmentOptions = { safe: false, parallelChunkSize: 16384 };
+const tokensParallel: string[] = tok.segment("สวัสดีครับ", options);
 ```
 
 ## Segment options
