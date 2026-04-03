@@ -1,4 +1,4 @@
-name: Test nlpo3-js (JavaScript binding)
+name: Test nlpo3-js
 on:
   push:
     branches:

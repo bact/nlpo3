@@ -59,7 +59,7 @@ tokens = tok.segment("สวัสดีครับ")
 
 JavaScript:
 
-```typescript
+```javascript
 // Before (v1.x)
 loadDict("path/to/dict.txt", "mydict");
 const tokens = segment("สวัสดีครับ", "mydict", false, false);
