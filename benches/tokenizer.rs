@@ -34,6 +34,11 @@
 //! HTML reports land in `target/criterion/`.
 
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
+#[cfg(feature = "deepcut")]
+use nlpo3::tokenizer::{
+    deepcut::DeepcutTokenizer, parallel_helper, parallel_options::ParallelOptions,
+    tcc::tcc_tokenizer,
+};
 use nlpo3::{
     char_string::CharString,
     tokenizer::{
@@ -41,13 +46,6 @@ use nlpo3::{
         newmm::{NewmmFstTokenizer, NewmmTokenizer},
         trie_char::TrieChar,
     },
-};
-#[cfg(feature = "deepcut")]
-use nlpo3::tokenizer::{
-    deepcut::DeepcutTokenizer,
-    parallel_helper,
-    parallel_options::ParallelOptions,
-    tcc::tcc_tokenizer,
 };
 use std::hint::black_box;
 

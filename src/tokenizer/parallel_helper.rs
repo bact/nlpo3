@@ -73,13 +73,7 @@ pub fn split_text_into_chunks<'a>(
         target_end_byte = clamp_to_char_boundary_right(text, target_end_byte);
         let target_end = index.byte_to_char(target_end_byte).unwrap_or(char_count);
         // Find the best break point near the target
-        let break_pos = find_best_break_point(
-            text,
-            &index,
-            start,
-            target_end,
-            valid_break_points,
-        );
+        let break_pos = find_best_break_point(text, &index, start, target_end, valid_break_points);
         // Extract chunk from start to break_pos (in byte offsets)
         if break_pos > start {
             let start_byte = index.char_to_byte(start);
@@ -132,11 +126,9 @@ fn find_best_break_point(
         if let Some(pos) = find_prev_break_in_range(tcc_positions, start, end) {
             return pos;
         }
-        if let Some(pos) = find_next_break_in_range(
-            tcc_positions,
-            end.saturating_add(1),
-            index.char_count(),
-        ) {
+        if let Some(pos) =
+            find_next_break_in_range(tcc_positions, end.saturating_add(1), index.char_count())
+        {
             return pos;
         }
         return start;
@@ -183,11 +175,9 @@ fn find_best_break_point(
     }
 
     // Fall back to nearest TCC position within search range
-    if let Some(pos) = find_prev_break_in_range(
-        tcc_positions,
-        start,
-        target_end.min(index.char_count()),
-    ) {
+    if let Some(pos) =
+        find_prev_break_in_range(tcc_positions, start, target_end.min(index.char_count()))
+    {
         return pos;
     }
 
@@ -318,7 +308,7 @@ mod tests {
     fn test_split_text_into_chunks_preserves_text_roundtrip() {
         let text = "ภาษาไทยภาษาไทยภาษาไทยABC";
         let char_count = text.chars().count();
-            let valid_break_points: Vec<usize> = (0..=char_count).collect();
+        let valid_break_points: Vec<usize> = (0..=char_count).collect();
 
         let chunks = split_text_into_chunks(text, 8, &valid_break_points);
         assert!(chunks.len() > 1);
@@ -358,7 +348,7 @@ mod tests {
     fn test_split_text_sparse_breakpoints_preserves_text() {
         let text = "ภาษาไทยภาษาไทยภาษาไทยABC";
         let char_count = text.chars().count();
-            let valid_break_points: Vec<usize> = [0, char_count].into_iter().collect();
+        let valid_break_points: Vec<usize> = [0, char_count].into_iter().collect();
 
         let chunks = split_text_into_chunks(text, 8, &valid_break_points);
         let rebuilt = chunks.concat();

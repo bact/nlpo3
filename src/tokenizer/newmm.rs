@@ -383,7 +383,10 @@ impl<D: DictBackend> NewmmTokenizer<D> {
             let prefixes = custom_dict.prefix_lengths_of(&sub_text_prefix);
             for word_length in prefixes {
                 let end_position_candidate = begin_position + word_length;
-                    if valid_position.binary_search(&end_position_candidate).is_ok() {
+                if valid_position
+                    .binary_search(&end_position_candidate)
+                    .is_ok()
+                {
                     graph
                         .entry(begin_position)
                         .or_default()
@@ -556,11 +559,9 @@ impl<D: DictBackend> NewmmTokenizer<D> {
             parallel_options.chunk_size,
             &tcc_positions,
         );
-        let token_vecs = parallel_helper::tokenize_chunks(
-            chunks,
-            should_parallelize,
-            |chunk| Self::segment_single(&CharString::new(chunk), custom_dict, safe),
-        )?;
+        let token_vecs = parallel_helper::tokenize_chunks(chunks, should_parallelize, |chunk| {
+            Self::segment_single(&CharString::new(chunk), custom_dict, safe)
+        })?;
 
         Ok(parallel_helper::flatten_tokens(token_vecs))
     }

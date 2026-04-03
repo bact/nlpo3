@@ -584,11 +584,9 @@ impl DeepcutTokenizer {
         let tcc_positions = tcc_tokenizer::tcc_pos(text);
         let chunks =
             parallel_helper::split_text_into_chunks(text, options.chunk_size, &tcc_positions);
-        let token_vecs = parallel_helper::tokenize_chunks(
-            chunks,
-            should_parallelize,
-            |chunk| self.tokenize(chunk),
-        )?;
+        let token_vecs = parallel_helper::tokenize_chunks(chunks, should_parallelize, |chunk| {
+            self.tokenize(chunk)
+        })?;
 
         Ok(parallel_helper::flatten_tokens(token_vecs))
     }
