@@ -682,7 +682,9 @@ mod tests {
         let text = "ภาษาไทยทดสอบการตัดคำ";
 
         let via_default = tok.segment_to_string(text).unwrap();
-        let via_explicit = tok.segment_to_string_with_options(text, false, None).unwrap();
+        let via_explicit = tok
+            .segment_to_string_with_options(text, false, None)
+            .unwrap();
         let via_result = tok.segment_with_options(text, false, None).unwrap();
 
         assert_eq!(via_default, via_explicit);
@@ -695,8 +697,8 @@ mod tests {
         let text = "ภาษาไทยทดสอบการตัดคำ";
 
         let via_inherent = tok.segment_to_string(text).unwrap();
-        let via_trait = <NewmmTokenizer<TrieChar> as Tokenizer>::segment_to_string(&tok, text)
-            .unwrap();
+        let via_trait =
+            <NewmmTokenizer<TrieChar> as Tokenizer>::segment_to_string(&tok, text).unwrap();
 
         assert_eq!(via_inherent, via_trait);
     }
@@ -707,7 +709,9 @@ mod tests {
         let text = "ภาษาไทยทดสอบการตัดคำ";
 
         let via_default = tok.segment_to_string(text).unwrap();
-        let via_explicit = tok.segment_to_string_with_options(text, false, None).unwrap();
+        let via_explicit = tok
+            .segment_to_string_with_options(text, false, None)
+            .unwrap();
         let via_result = tok.segment_with_options(text, false, None).unwrap();
 
         assert_eq!(via_default, via_explicit);
