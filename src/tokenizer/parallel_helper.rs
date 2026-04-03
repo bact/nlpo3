@@ -7,7 +7,6 @@
 //! boundaries and prefer natural punctuation breaks. Never breaks inside a TCC cluster.
 
 use rayon::prelude::*;
-use rustc_hash::FxHashSet;
 
 /// Context window to search for good break points around the target split location.
 const BREAK_SEARCH_WINDOW: usize = 100;
@@ -54,11 +53,11 @@ impl TextIndex {
 /// # Arguments
 /// - `text`: The text to chunk
 /// - `target_chunk_size`: Approximate target chunk size
-/// - `valid_break_points`: Set of valid character indices where chunking can occur
+/// - `valid_break_points`: Sorted slice of valid character indices where chunking can occur
 pub fn split_text_into_chunks<'a>(
     text: &'a str,
     target_chunk_size: usize,
-    valid_break_points: &FxHashSet<usize>,
+    valid_break_points: &[usize],
 ) -> Vec<&'a str> {
     if text.len() <= target_chunk_size {
         return vec![text];
@@ -67,8 +66,6 @@ pub fn split_text_into_chunks<'a>(
     let char_count = index.char_count();
     let est_chunks = text.len().div_ceil(target_chunk_size).max(1);
     let mut chunks = Vec::with_capacity(est_chunks);
-    let mut sorted_break_points: Vec<usize> = valid_break_points.iter().copied().collect();
-    sorted_break_points.sort_unstable();
     let mut start: usize = 0; // character index
     while start < char_count {
         let start_byte = index.char_to_byte(start);
@@ -82,7 +79,6 @@ pub fn split_text_into_chunks<'a>(
             start,
             target_end,
             valid_break_points,
-            &sorted_break_points,
         );
         // Extract chunk from start to break_pos (in byte offsets)
         if break_pos > start {
@@ -93,7 +89,7 @@ pub fn split_text_into_chunks<'a>(
         } else {
             // Fallback: preserve text and make forward progress.
             let fallback_break_pos =
-                find_next_break_in_range(&sorted_break_points, start.saturating_add(1), char_count)
+                find_next_break_in_range(valid_break_points, start.saturating_add(1), char_count)
                     .unwrap_or((start + 1).min(char_count));
             let start_byte = index.char_to_byte(start);
             let break_byte = index.char_to_byte(fallback_break_pos);
@@ -116,8 +112,7 @@ fn find_best_break_point(
     index: &TextIndex,
     start: usize,
     target_end: usize,
-    tcc_positions: &FxHashSet<usize>,
-    sorted_tcc_positions: &[usize],
+    tcc_positions: &[usize],
 ) -> usize {
     let start_byte = index.char_to_byte(start);
     let target_byte = index.char_to_byte(target_end.min(index.char_count()));
@@ -134,11 +129,11 @@ fn find_best_break_point(
 
     if search_start_byte >= search_end_byte {
         let end = target_end.min(index.char_count());
-        if let Some(pos) = find_prev_break_in_range(sorted_tcc_positions, start, end) {
+        if let Some(pos) = find_prev_break_in_range(tcc_positions, start, end) {
             return pos;
         }
         if let Some(pos) = find_next_break_in_range(
-            sorted_tcc_positions,
+            tcc_positions,
             end.saturating_add(1),
             index.char_count(),
         ) {
@@ -159,7 +154,7 @@ fn find_best_break_point(
         if let Some(after) = punct_pos.checked_add(get_char_at_offset(text, punct_pos).len_utf8()) {
             if after < text.len() && text[after..].starts_with(' ') {
                 if let Some(char_idx) = index.byte_to_char(after + 1) {
-                    if tcc_positions.contains(&char_idx) {
+                    if is_valid_break_point(tcc_positions, char_idx) {
                         return char_idx;
                     }
                 }
@@ -168,7 +163,7 @@ fn find_best_break_point(
         // Fallback to just after the punctuation
         if let Some(char_idx) = index.byte_to_char(punct_pos) {
             if let Some(next_idx) = char_idx.checked_add(1) {
-                if tcc_positions.contains(&next_idx) {
+                if is_valid_break_point(tcc_positions, next_idx) {
                     return next_idx;
                 }
             }
@@ -181,7 +176,7 @@ fn find_best_break_point(
         if let Some(char_idx) = index.byte_to_char(
             space_byte.saturating_add(get_char_at_offset(text, space_byte).len_utf8()),
         ) {
-            if tcc_positions.contains(&char_idx) {
+            if is_valid_break_point(tcc_positions, char_idx) {
                 return char_idx;
             }
         }
@@ -189,7 +184,7 @@ fn find_best_break_point(
 
     // Fall back to nearest TCC position within search range
     if let Some(pos) = find_prev_break_in_range(
-        sorted_tcc_positions,
+        tcc_positions,
         start,
         target_end.min(index.char_count()),
     ) {
@@ -198,7 +193,7 @@ fn find_best_break_point(
 
     // Keep boundaries aligned with valid break points by searching forward.
     if let Some(pos) = find_next_break_in_range(
-        sorted_tcc_positions,
+        tcc_positions,
         target_end.saturating_add(1),
         index.char_count(),
     ) {
@@ -240,6 +235,11 @@ fn find_next_break_in_range(sorted_points: &[usize], start: usize, end: usize) -
     } else {
         None
     }
+}
+
+/// Check if a character position is a valid break point using binary search on sorted array.
+fn is_valid_break_point(sorted_positions: &[usize], pos: usize) -> bool {
+    sorted_positions.binary_search(&pos).is_ok()
 }
 
 /// Get the character at a byte offset.
@@ -318,7 +318,7 @@ mod tests {
     fn test_split_text_into_chunks_preserves_text_roundtrip() {
         let text = "ภาษาไทยภาษาไทยภาษาไทยABC";
         let char_count = text.chars().count();
-        let valid_break_points: FxHashSet<usize> = (0..=char_count).collect();
+            let valid_break_points: Vec<usize> = (0..=char_count).collect();
 
         let chunks = split_text_into_chunks(text, 8, &valid_break_points);
         assert!(chunks.len() > 1);
@@ -358,7 +358,7 @@ mod tests {
     fn test_split_text_sparse_breakpoints_preserves_text() {
         let text = "ภาษาไทยภาษาไทยภาษาไทยABC";
         let char_count = text.chars().count();
-        let valid_break_points: FxHashSet<usize> = [0, char_count].into_iter().collect();
+            let valid_break_points: Vec<usize> = [0, char_count].into_iter().collect();
 
         let chunks = split_text_into_chunks(text, 8, &valid_break_points);
         let rebuilt = chunks.concat();

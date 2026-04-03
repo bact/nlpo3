@@ -383,7 +383,7 @@ impl<D: DictBackend> NewmmTokenizer<D> {
             let prefixes = custom_dict.prefix_lengths_of(&sub_text_prefix);
             for word_length in prefixes {
                 let end_position_candidate = begin_position + word_length;
-                if valid_position.contains(&end_position_candidate) {
+                    if valid_position.binary_search(&end_position_candidate).is_ok() {
                     graph
                         .entry(begin_position)
                         .or_default()
