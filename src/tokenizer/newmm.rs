@@ -112,15 +112,15 @@ impl Error for BFSSearchError {}
 /// All dictionary-based tokenizers implement the shared [`Tokenizer`] trait,
 /// so switching between them requires only a single line change:
 ///
-/// ```ignore
+/// ```
 /// use nlpo3::tokenizer::newmm::{NewmmTokenizer, NewmmFstTokenizer};
 /// use nlpo3::tokenizer::tokenizer_trait::Tokenizer;
 ///
 /// // Maximum speed (CharString + TrieChar):
-/// let tok: Box<dyn Tokenizer> = Box::new(NewmmTokenizer::new("words_th.txt").unwrap());
+/// let _tok: Box<dyn Tokenizer> = Box::new(NewmmTokenizer::new("words_th.txt").unwrap());
 ///
 /// // Compact memory (CharString + FstDict):
-/// let tok: Box<dyn Tokenizer> = Box::new(NewmmFstTokenizer::new("words_th.txt").unwrap());
+/// let _tok: Box<dyn Tokenizer> = Box::new(NewmmFstTokenizer::new("words_th.txt").unwrap());
 /// ```
 #[derive(Debug)]
 pub struct NewmmTokenizer<D: DictBackend = TrieChar> {

@@ -142,26 +142,23 @@ fn find_best_break_point(
     let best_pos = start; // fallback to "no decision"
 
     // Look for punctuation breaks (priority: highest)
-    if let Some(idx) = search_range.rfind(|c: char| matches!(c, '。' | '!' | '?' | '！' | '？'))
-    {
+    if let Some(idx) = search_range.rfind(['。', '!', '?', '！', '？']) {
         let punct_pos = search_start_byte + idx;
         // Prefer a space after punctuation if available
-        if let Some(after) = punct_pos.checked_add(get_char_at_offset(text, punct_pos).len_utf8()) {
-            if after < text.len() && text[after..].starts_with(' ') {
-                if let Some(char_idx) = index.byte_to_char(after + 1) {
-                    if is_valid_break_point(tcc_positions, char_idx) {
-                        return char_idx;
-                    }
-                }
-            }
+        if let Some(after) = punct_pos.checked_add(get_char_at_offset(text, punct_pos).len_utf8())
+            && after < text.len()
+            && text[after..].starts_with(' ')
+            && let Some(char_idx) = index.byte_to_char(after + 1)
+            && is_valid_break_point(tcc_positions, char_idx)
+        {
+            return char_idx;
         }
         // Fallback to just after the punctuation
-        if let Some(char_idx) = index.byte_to_char(punct_pos) {
-            if let Some(next_idx) = char_idx.checked_add(1) {
-                if is_valid_break_point(tcc_positions, next_idx) {
-                    return next_idx;
-                }
-            }
+        if let Some(char_idx) = index.byte_to_char(punct_pos)
+            && let Some(next_idx) = char_idx.checked_add(1)
+            && is_valid_break_point(tcc_positions, next_idx)
+        {
+            return next_idx;
         }
     }
 
@@ -170,10 +167,9 @@ fn find_best_break_point(
         let space_byte = search_start_byte + idx;
         if let Some(char_idx) = index.byte_to_char(
             space_byte.saturating_add(get_char_at_offset(text, space_byte).len_utf8()),
-        ) {
-            if is_valid_break_point(tcc_positions, char_idx) {
-                return char_idx;
-            }
+        ) && is_valid_break_point(tcc_positions, char_idx)
+        {
+            return char_idx;
         }
     }
 
