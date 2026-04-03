@@ -543,19 +543,13 @@ impl<D: DictBackend> NewmmTokenizer<D> {
         if input.is_empty() {
             return Ok(vec![]);
         }
-
-        // Preserve historical safe-mode behavior; safe mode already uses a
-        // dedicated splitting strategy to avoid pathological inputs.
-        if safe {
-            return Self::segment_single(input, custom_dict, true);
-        }
-
-        let parallel_options = ParallelOptions::from_chunk_size(parallel_chunk_size);
-        if !parallel_options.enabled || input.as_str().len() <= parallel_options.chunk_size {
-            return Self::segment_single(input, custom_dict, false);
-        }
-
         let text = input.as_str();
+        let parallel_options = ParallelOptions::from_chunk_size(parallel_chunk_size);
+        let should_parallelize = parallel_options.should_parallelize(text.len());
+        if !should_parallelize {
+            return Self::segment_single(input, custom_dict, safe);
+        }
+
         let tcc_positions = tcc_tokenizer::tcc_pos(text);
         let chunks = parallel_helper::split_text_into_chunks(
             text,
@@ -564,8 +558,8 @@ impl<D: DictBackend> NewmmTokenizer<D> {
         );
         let token_vecs = parallel_helper::tokenize_chunks(
             chunks,
-            parallel_options.should_parallelize(text.len()),
-            |chunk| Self::segment_single(&CharString::new(chunk), custom_dict, false),
+            should_parallelize,
+            |chunk| Self::segment_single(&CharString::new(chunk), custom_dict, safe),
         )?;
 
         Ok(parallel_helper::flatten_tokens(token_vecs))
@@ -594,7 +588,7 @@ impl<D: DictBackend> NewmmTokenizer<D> {
 
     /// Segment text with explicit options.
     ///
-    /// When `parallel_chunk_size` is set, text is split into chunks before
+    /// When parallel mode is active, text is split into chunks before
     /// tokenization. Token sequences near chunk boundaries may differ from
     /// full-text results. This is acceptable for throughput-oriented tasks
     /// such as text classification and word embedding, but may not be suitable

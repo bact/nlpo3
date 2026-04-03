@@ -556,7 +556,7 @@ impl DeepcutTokenizer {
     ///
     /// # Chunk boundary behavior
     ///
-    /// When `parallel_chunk_size` is set, text is split into chunks before
+    /// When parallel mode is active, text is split into chunks before
     /// tokenization. Because deepcut uses a fixed-width context window, characters
     /// near chunk boundaries have fewer adjacent context characters from the
     /// neighboring chunk. This causes token sequences near boundaries to differ
@@ -576,12 +576,8 @@ impl DeepcutTokenizer {
         }
 
         let options = ParallelOptions::from_chunk_size(parallel_chunk_size);
-
-        if !options.enabled {
-            return self.tokenize(text);
-        }
-
-        if text.len() <= options.chunk_size {
+        let should_parallelize = options.should_parallelize(text.len());
+        if !should_parallelize {
             return self.tokenize(text);
         }
 
@@ -590,7 +586,7 @@ impl DeepcutTokenizer {
             parallel_helper::split_text_into_chunks(text, options.chunk_size, &tcc_positions);
         let token_vecs = parallel_helper::tokenize_chunks(
             chunks,
-            options.should_parallelize(text.len()),
+            should_parallelize,
             |chunk| self.tokenize(chunk),
         )?;
 
