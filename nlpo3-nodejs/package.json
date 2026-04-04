@@ -49,11 +49,14 @@
     "release": "cargo-cp-artifact -a cdylib nlpo3_nodejs ./nlpo3/rust_mod.node -- cargo build --release --message-format=json-render-diagnostics && tsc",
     "prepare": "npm run build",
     "prepack": "npm run release",
+    "install": "npm run build",
     "test": "npm run build && tsc && node --test tests/test_tokenizers.js"
+  },
+  "dependencies": {
+    "cargo-cp-artifact": "^0.1.9"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
-    "cargo-cp-artifact": "^0.1.9",
     "typescript": "^6.0.0"
   },
   "engines": {
@@ -64,8 +67,12 @@
   },
   "files": [
     "Cargo.toml",
+    "Cargo.lock",
     "src/**",
-    "nlpo3/**",
+    "nlpo3/index.js",
+    "nlpo3/index.d.ts",
+    "nlpo3/rust_mod.js",
+    "nlpo3/rust_mod.d.ts",
     "README.md",
     "LICENSE"
   ]
