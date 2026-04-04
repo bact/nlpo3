@@ -17,7 +17,6 @@ Rust-powered Thai tokenization library for Node.js.
 	- `NewmmFstTokenizer` — FST-accelerated dictionary tokenizer.
 	- `DeepcutTokenizer` — Neural network-based tokenizer.
 - Framework-independent and suitable for plain Node.js applications.
-- Targets Node.js 22, 23, 24, and 25.
 - Built and type-checked with TypeScript `module: "NodeNext"` for Node-native ESM behavior.
 
 ## Runtime support
@@ -34,8 +33,6 @@ Install the package via [npm](https://www.npmjs.com/package/nlpo3):
 ```shell
 npm i nlpo3
 ```
-
-Requires Node.js 22 or newer.
 
 ## Quick start
 
