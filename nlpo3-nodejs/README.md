@@ -13,9 +13,9 @@ Rust-powered Thai tokenization library for Node.js.
 
 - Node.js-native ESM package backed by a Rust `.node` addon.
 - Three tokenizer classes:
-	- `NewmmTokenizer` — Dictionary-based maximal-matching tokenizer.
-	- `NewmmFstTokenizer` — FST-accelerated dictionary tokenizer.
-	- `DeepcutTokenizer` — Neural network-based tokenizer.
+  - `NewmmTokenizer` — Dictionary-based maximal-matching tokenizer.
+  - `NewmmFstTokenizer` — FST-accelerated dictionary tokenizer.
+  - `DeepcutTokenizer` — Neural network-based tokenizer.
 - Framework-independent and suitable for plain Node.js applications.
 - Built and type-checked with TypeScript `module: "NodeNext"` for Node-native ESM behavior.
 
