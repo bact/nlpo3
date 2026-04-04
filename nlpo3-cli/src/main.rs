@@ -122,21 +122,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     for line_opt in io::stdin().lock().lines() {
         let line = line_opt?;
-        let cleaned_line = line.trim_end_matches('\n');
         let toks = match &tokenizer {
             TokenizerWrapper::Newmm(tok) => tok.segment_with_options(
-                cleaned_line,
+                &line,
                 segment_opts.safe,
                 segment_opts.parallel_chunk_size,
             )?,
             TokenizerWrapper::Nf(tok) => tok.segment_with_options(
-                cleaned_line,
+                &line,
                 segment_opts.safe,
                 segment_opts.parallel_chunk_size,
             )?,
             #[cfg(feature = "deepcut")]
             TokenizerWrapper::Deepcut(tok) => {
-                tok.segment_with_options(cleaned_line, segment_opts.parallel_chunk_size)?
+                tok.segment_with_options(&line, segment_opts.parallel_chunk_size)?
             }
         };
         println!("{}", toks.join(segment_opts.word_delimiter.as_str()));

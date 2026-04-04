@@ -544,23 +544,13 @@ impl<D: DictBackend> NewmmTokenizer<D> {
             &tcc_positions,
         );
 
-        let token_vecs: Vec<Vec<String>> = if should_parallelize {
-            chunk_ranges
-                .into_par_iter()
-                .map(|(start, end)| {
-                    let chunk = input.substring(start, end);
-                    Self::segment_single(&chunk, custom_dict, safe)
-                })
-                .collect::<AnyResult<Vec<_>>>()?
-        } else {
-            chunk_ranges
-                .into_iter()
-                .map(|(start, end)| {
-                    let chunk = input.substring(start, end);
-                    Self::segment_single(&chunk, custom_dict, safe)
-                })
-                .collect::<AnyResult<Vec<_>>>()?
-        };
+        let token_vecs: Vec<Vec<String>> = chunk_ranges
+            .into_par_iter()
+            .map(|(start, end)| {
+                let chunk = input.substring(start, end);
+                Self::segment_single(&chunk, custom_dict, safe)
+            })
+            .collect::<AnyResult<Vec<_>>>()?;
 
         Ok(parallel_helper::flatten_tokens(token_vecs))
     }

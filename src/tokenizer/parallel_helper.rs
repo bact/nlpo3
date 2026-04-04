@@ -109,7 +109,7 @@ fn split_text_into_chunk_ranges_with_index(
         target_end_byte = clamp_to_char_boundary_right(text, target_end_byte);
         let target_end = index.byte_to_char(target_end_byte).unwrap_or(char_count);
         // Find the best break point near the target
-        let break_pos = find_best_break_point(text, &index, start, target_end, valid_break_points);
+        let break_pos = find_best_break_point(text, index, start, target_end, valid_break_points);
         // Extract chunk from start to break_pos (in byte offsets)
         if break_pos > start {
             chunks.push((start, break_pos));

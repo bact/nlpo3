@@ -24,6 +24,7 @@ Use this file as the default working agreement for nlpO3.
 - Error semantics: verify callers get consistent error types and messages.
 - Performance claims: avoid overstated complexity claims; document real guarantees only.
 - Packaging metadata: keep manifest metadata complete, accurate, and ecosystem-friendly.
+- Branches: verify branch logic, early return, and dead code.
 - Language examples: label code fences correctly and separate JavaScript and TypeScript when syntax differs.
 
 ## API design rules

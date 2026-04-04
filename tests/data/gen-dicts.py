@@ -1,8 +1,12 @@
+# SPDX-FileCopyrightText: 2026 PyThaiNLP Project
+# SPDX-License-Identifier: Apache-2.0
+
 """Regenerate all three benchmark dictionaries with proper prefix-diverse sampling.
 
 Fix: shuffle the list of prefix groups before round-robin so we don't
 just take the first N sorted prefixes (which are all ก/ข for Thai).
 """
+
 import random
 from collections import defaultdict, Counter
 from pathlib import Path
@@ -61,7 +65,9 @@ def stats(label, picked):
     # count distinct first chars
     first_chars = Counter(w[0] for w in picked)
     print(f"{label}: {len(picked)} words")
-    print(f"  distinct 3-char prefixes: {len(prefix_counts)}, max per prefix: {max(prefix_counts.values())}")
+    print(
+        f"  distinct 3-char prefixes: {len(prefix_counts)}, max per prefix: {max(prefix_counts.values())}"
+    )
     print(f"  distinct first chars: {len(first_chars)}")
     print(f"  len range: {min(len(w) for w in picked)}-{max(len(w) for w in picked)}")
     print(f"  len dist: { {k: lc[k] for k in sorted(lc)} }")
@@ -85,9 +91,11 @@ picked_medium = prefix_diverse_sample(all_words, 10000)
 stats("Medium", picked_medium)
 
 # Write files
-for name, picked in [("500-short", picked_short),
-                     ("500-long", picked_long),
-                     ("10k", picked_medium)]:
+for name, picked in [
+    ("500-short", picked_short),
+    ("500-long", picked_long),
+    ("10k", picked_medium),
+]:
     out = base / f"{name}.txt"
     with open(out, "w", encoding="utf-8") as f:
         f.write("\n".join(sorted(picked)) + "\n")
